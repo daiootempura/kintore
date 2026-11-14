@@ -353,7 +353,7 @@ input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
 
   </div>
   </div>
-<p class="note" id="ver" style="text-align:center;flex:none;margin:0 0 4px">版 18</p>
+<p class="note" id="ver" style="text-align:center;flex:none;margin:0 0 4px">版 19</p>
 </div>
 
 <script type="module">
@@ -445,7 +445,7 @@ function benchLevel(uid){ // ベンチプレスで実際に記録した最高重
 function nameOf(uid){
   var m=members[uid]||allMembers[uid]||{};
   var n=m.nick||names[uid]||'';
-  if(uid===myId)return n?n+'（自分）':'自分';
+  if(uid===myId)return n||'自分';
   return n||'メンバー';
 }
 function linkMine(node,uid){ // 自分のアイコン・名前を押すとプロフィール（設定）へ
