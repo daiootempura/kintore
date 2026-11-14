@@ -834,24 +834,25 @@ $('form').addEventListener('submit',function(ev){
   function newBolt(R,surge,lv){
     var t=rnd(0,Math.PI*2), kind=Math.random(), k=surge?1:0, b={life:surge?rnd(2,5):rnd(2,4),w:rnd(.7,1.15)+(surge?.25:0)};
     b.x1=Math.cos(t)*R; b.y1=Math.sin(t)*R;
-    if(kind<.5){            // 外へ飛ぶ
-      var r2=R*rnd(1.35,1.75+.55*k+.1*lv), t2=t+rnd(-.5,.5);
+    if(kind<.32){           // 外へ飛ぶ（アイコンから離れすぎない高さまで）
+      var r2=R*rnd(1.15,1.4+.3*k+.05*lv), t2=t+rnd(-.6,.6);
       b.x2=Math.cos(t2)*r2; b.y2=Math.sin(t2)*r2; b.rough=.42;
-    }else if(kind<.8){      // 輪に沿って這う
-      var t3=t+rnd(.5,1.2+.5*k)*(Math.random()<.5?1:-1), r3=R*rnd(1.0,1.12);
+    }else if(kind<.66){     // 輪に沿って這う
+      var t3=t+rnd(.5,1.2+.5*k)*(Math.random()<.5?1:-1), r3=R*rnd(.94,1.08);
       b.x2=Math.cos(t3)*r3; b.y2=Math.sin(t3)*r3; b.rough=.5;
-    }else{                  // 内側へ入り込む
-      var t4=t+rnd(-.9,.9), r4=R*rnd(.35,.8);
-      b.x2=Math.cos(t4)*r4; b.y2=Math.sin(t4)*r4; b.rough=.45;
+    }else{                  // アイコンの上を横切る（細く薄めに描き、顔や文字を隠しすぎない）
+      var t4=t+Math.PI+rnd(-1.1,1.1), r4=R*rnd(.3,.95);
+      b.x2=Math.cos(t4)*r4; b.y2=Math.sin(t4)*r4; b.rough=.4; b.w*=.7; b.a=.7;
     }
     b.branch=Math.random()<(surge?.75:.4)?{at:rnd(.3,.75),ang:rnd(-1,1),len:rnd(.3,.55)}:null;
     b.glint=Math.random()<(surge?.8:.35);
     return b;
   }
-  function stroke(c,pts,col,core,w,u){
+  function stroke(c,pts,col,core,w,u,al){
+    al=al||1;
     c.beginPath(); c.moveTo(pts[0][0],pts[0][1]); for(var i=1;i<pts.length;i++)c.lineTo(pts[i][0],pts[i][1]);
-    c.shadowColor=col; c.shadowBlur=7*u; c.strokeStyle=col; c.globalAlpha=.6; c.lineWidth=2.4*w*u; c.stroke();
-    c.shadowBlur=3*u; c.strokeStyle=core; c.globalAlpha=1; c.lineWidth=(core===col?1.5:.95)*w*u; c.stroke();
+    c.shadowColor=col; c.shadowBlur=7*u; c.strokeStyle=col; c.globalAlpha=.6*al; c.lineWidth=2.4*w*u; c.stroke();
+    c.shadowBlur=3*u; c.strokeStyle=core; c.globalAlpha=al; c.lineWidth=(core===col?1.5:.95)*w*u; c.stroke();
   }
   function glint(c,x,y,col,core,u,size){ // 稲妻の先で弾ける十字の火花
     c.shadowColor=col; c.shadowBlur=6*u; c.strokeStyle=core; c.globalAlpha=1; c.lineWidth=.9*u;
@@ -860,10 +861,10 @@ $('form').addEventListener('submit',function(ev){
   }
   function drawBolt(c,b,col,core,u){
     var pts=jag(b.x1,b.y1,b.x2,b.y2,b.rough,4);
-    stroke(c,pts,col,core,b.w,u);
+    stroke(c,pts,col,core,b.w,u,b.a);
     if(b.branch){
       var p=pts[Math.floor(pts.length*b.branch.at)], dx=b.x2-b.x1, dy=b.y2-b.y1, L=Math.sqrt(dx*dx+dy*dy)*b.branch.len, a=Math.atan2(dy,dx)+b.branch.ang;
-      stroke(c,jag(p[0],p[1],p[0]+Math.cos(a)*L,p[1]+Math.sin(a)*L,.5,3),col,core,b.w*.6,u);
+      stroke(c,jag(p[0],p[1],p[0]+Math.cos(a)*L,p[1]+Math.sin(a)*L,.5,3),col,core,b.w*.6,u,b.a);
     }
     if(b.glint)glint(c,b.x2,b.y2,col,core,u,rnd(2.2,4.6)*u);
   }
@@ -889,7 +890,7 @@ $('form').addEventListener('submit',function(ev){
       var core=dk?'#ffffff':col;   // 白い画面では白い芯が見えないので、色そのもので描く
       c.translate(size/2,size/2); c.lineCap='round'; c.lineJoin='round';
       for(var b=0;b<st.bolts.length;b++)drawBolt(c,st.bolts[b],col,core,u);
-      if(surge){for(var g=0;g<2;g++){var t=rnd(0,Math.PI*2),rr=R*rnd(.95,1.5);glint(c,Math.cos(t)*rr,Math.sin(t)*rr,col,core,u,rnd(1.6,3.4)*u);}}
+      if(surge){for(var g=0;g<2;g++){var t=rnd(0,Math.PI*2),rr=R*rnd(.7,1.25);glint(c,Math.cos(t)*rr,Math.sin(t)*rr,col,core,u,rnd(1.6,3.4)*u);}}
       c.globalAlpha=1; c.shadowBlur=0;
     }
   }
