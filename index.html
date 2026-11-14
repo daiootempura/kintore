@@ -47,11 +47,18 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15p
 .aw{position:relative;display:inline-flex;flex:none;--aura:#1faa4b}
 .aw.lv2{--aura:#1f7ae0}
 .aw.lv3{--aura:#e02b2b}
+.aw.lv4,.aw.lv5{--aura:#f2b705}
+.aw.noaura .av,.aw.noaura.sm .av{border-color:var(--ink);box-shadow:none}
+.aw .crown{position:absolute;left:50%;top:0;width:70%;transform:translate(-50%,-62%) rotate(-10deg);z-index:2;pointer-events:none;filter:drop-shadow(0 1px 1px rgba(0,0,0,.35))}
+.aw .crown svg{display:block;width:100%;height:auto}
+.aw.sm .crown{width:90%;transform:translate(-50%,-55%) rotate(-10deg)}
 .aw .av{border-color:#fff;box-shadow:0 0 0 1.5px var(--aura),0 0 7px 2px var(--aura);transition:box-shadow .12s}
 .aw.surge .av{box-shadow:0 0 0 1px #fff,0 0 0 3px var(--aura),0 0 16px 6px var(--aura)}
 .aw canvas{position:absolute;left:50%;top:50%;width:320%;height:320%;transform:translate(-50%,-50%);pointer-events:none;z-index:1}
 .aw.sm .av{border-color:var(--aura);box-shadow:0 0 0 1.5px var(--aura)}
 .hint{display:none!important}
+label.check{flex-direction:row;align-items:center;gap:8px;font-size:14px;color:var(--ink);cursor:pointer}
+label.check input{width:20px;height:20px;min-height:0;margin:0;accent-color:var(--ink)}
 .lvkey{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted)}
 .lvkey span{display:inline-flex;align-items:center;gap:5px}
 .lvkey em{width:10px;height:10px;border-radius:50%;display:inline-block}
@@ -235,6 +242,7 @@ input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
       <label for="goalIn">目標（友達にも表示されます）
         <input id="goalIn" maxlength="60" placeholder="例: 年内にベンチプレス100kg">
       </label>
+      <label class="check" for="auraIn"><input type="checkbox" id="auraIn" checked> 自分のアイコンに稲妻を付ける</label>
       <div class="photoRow">
         <button class="btn primary" id="setupGo" type="submit">はじめる</button>
         <button class="btn" id="setupBack" type="button">戻る</button>
@@ -302,6 +310,8 @@ input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
       <span><em style="background:#1faa4b"></em>60 kg</span>
       <span><em style="background:#1f7ae0"></em>70 kg</span>
       <span><em style="background:#e02b2b"></em>80 kg</span>
+      <span><em style="background:#f2b705"></em>90 kg</span>
+      <span>100 kg で王冠</span>
     </div>
   </section>
   <section class="card" id="linkCard" aria-label="招待リンク">
@@ -339,7 +349,7 @@ input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
 
   </div>
   </div>
-<p class="note" id="ver" style="text-align:center;flex:none;margin:0 0 4px">版 16</p>
+<p class="note" id="ver" style="text-align:center;flex:none;margin:0 0 4px">版 17</p>
 </div>
 
 <script type="module">
@@ -378,6 +388,7 @@ function clean(raw){ // 共有データは信用せず、形を整えてから�
   if(typeof raw.nick==='string')out.nick=raw.nick.slice(0,20);
   if(typeof raw.goal==='string')out.goal=raw.goal.trim().slice(0,60);
   out.u=num(raw.u);
+  if(raw.aura===false)out.aura=false;
   if(raw.gone===true)out.gone=true;
   if(Array.isArray(raw.ex))raw.ex.slice(0,60).forEach(function(x){if(typeof x==='string'){x=x.trim().slice(0,40);if(x&&out.ex.indexOf(x)<0)out.ex.push(x);}});
   if(raw.rep&&typeof raw.rep==='object')Object.keys(raw.rep).forEach(function(id){if(/^[A-Za-z0-9]{1,128}$/.test(id))out.rep[id]=num(raw.rep[id]);});
@@ -409,16 +420,23 @@ function avatar(uid,small){ // 選んだ写真。未設定なら名前の頭文�
   if(m.photo){var im=document.createElement('img');im.src=m.photo;im.alt='';a.appendChild(im);a.className+=' photo';}
   else{var n=(m.nick||names[uid]||'').trim();a.textContent=n?Array.from(n)[0]:'?';a.className+=' mono';}
   a.setAttribute('aria-hidden','true');
-  var lv=benchLevel(uid); if(!lv)return a;
-  var w=el('span','aw lv'+lv+(small?' sm':'')); w.setAttribute('aria-hidden','true');
-  w.appendChild(a); if(!small){var cv=document.createElement('canvas');cv.dataset.lv=lv;w.appendChild(cv);}
+  var lv=benchLevel(uid), aura=m.aura!==false;
+  if(!lv||(!aura&&lv<5))return a;
+  var w=el('span','aw '+(aura?'lv'+lv:'noaura')+(small?' sm':'')); w.setAttribute('aria-hidden','true');
+  w.appendChild(a);
+  if(aura&&!small){var cv=document.createElement('canvas');cv.dataset.lv=lv;w.appendChild(cv);}
+  if(lv>=5){ // 100kg: 王冠（稲妻を付けない設定でも表示）
+    var cr=el('span','crown');
+    cr.innerHTML='<svg viewBox="0 0 24 18"><path d="M2 15 L1 4 L7.5 9 L12 1.5 L16.5 9 L23 4 L22 15 Z" fill="#f5c518" stroke="#7a5600" stroke-width="1.3" stroke-linejoin="round"/><rect x="2" y="14.2" width="20" height="2.8" rx="1" fill="#e0a800" stroke="#7a5600" stroke-width="1.1"/><circle cx="12" cy="10.5" r="1.6" fill="#d7263d"/><circle cx="1" cy="4" r="1.4" fill="#f5c518" stroke="#7a5600" stroke-width=".8"/><circle cx="12" cy="1.5" r="1.4" fill="#f5c518" stroke="#7a5600" stroke-width=".8"/><circle cx="23" cy="4" r="1.4" fill="#f5c518" stroke="#7a5600" stroke-width=".8"/></svg>';
+    w.appendChild(cr);
+  }
   return w;
 }
-function benchLevel(uid){ // ベンチプレスで実際に記録した最高重量: 60kg→1(緑) 70kg→2(青) 80kg→3(赤)
+function benchLevel(uid){ // ベンチプレスで実際に記録した最高重量: 60kg→1(緑) 70kg→2(青) 80kg→3(赤) 90kg→4(金) 100kg→5(金＋王冠)
   var m=members[uid]||allMembers[uid]; if(!m||!m.d)return 0;
   var b=0;
   Object.keys(m.d).forEach(function(date){var day=m.d[date];Object.keys(day).forEach(function(id){if(day[id].ex==='ベンチプレス'&&day[id].kg>b)b=day[id].kg;});});
-  return b>=80?3:b>=70?2:b>=60?1:0;
+  return b>=100?5:b>=90?4:b>=80?3:b>=70?2:b>=60?1:0;
 }
 function nameOf(uid){
   var m=members[uid]||allMembers[uid]||{};
@@ -872,7 +890,7 @@ $('form').addEventListener('submit',function(ev){
       var dpr=Math.min(window.devicePixelRatio||1,3), size=Math.round(box.width*3.2*dpr);
       if(cv.width!==size){cv.width=size;cv.height=size;}
       var st=state.get(cv); if(!st){st={bolts:[],next:now+rnd(600,2600),end:0};state.set(cv,st);}
-      var lv=+cv.dataset.lv||1, u=dpr, R=box.width/2*dpr;
+      var lv=Math.min(+cv.dataset.lv||1,4), u=dpr, R=box.width/2*dpr;
       // ときどき激しくなる（レベルが高いほど頻繁に、長く）
       if(now>st.next){st.end=now+rnd(1100,1600)+lv*200;st.next=st.end+rnd(3600,6500)-lv*450;}
       var surge=now<st.end;
@@ -934,7 +952,7 @@ function showPrev(){
 }
 function openSetup(first){
   var m=(myId&&members[myId])||{};
-  endCrop(); pendingPhoto=m.photo||''; $('nickIn').value=m.nick||''; $('goalIn').value=m.goal||'';
+  endCrop(); pendingPhoto=m.photo||''; $('nickIn').value=m.nick||''; $('goalIn').value=m.goal||''; $('auraIn').checked=m.aura!==false;
   $('setupTitle').textContent=first?'はじめに、アイコンと名前を決めましょう':'自分のプロフィール';
   $('setupGo').textContent=first?'はじめる':'保存する';
   $('setupBack').hidden=!!first;
@@ -956,7 +974,7 @@ function renderTakeover(first){
 function takeOver(old){ // 以前の自分の記録を写し、古い方は一覧から隠す
   var o=members[old]; if(!o||readOnly||!myId)return;
   var m=mine();
-  m.nick=o.nick; m.photo=o.photo; m.goal=o.goal; m.ex=(o.ex||[]).slice(); m.d=JSON.parse(JSON.stringify(o.d));
+  m.nick=o.nick; m.photo=o.photo; m.goal=o.goal; if(o.aura===false)m.aura=false; else delete m.aura; m.ex=(o.ex||[]).slice(); m.d=JSON.parse(JSON.stringify(o.d));
   m.rep=JSON.parse(JSON.stringify(o.rep||{})); m.rep[old]=Date.now();
   delete members[old];
   closeSetup(); render(); saveMine();
@@ -1026,7 +1044,7 @@ $('setupForm').addEventListener('submit',function(ev){
   ev.preventDefault(); if(readOnly||!myId)return;
   var n=$('nickIn').value.trim().slice(0,20); if(!n)return;
   if(!exportCrop())return;
-  var m=mine(); m.nick=n; m.photo=pendingPhoto; m.goal=$('goalIn').value.trim().slice(0,60);
+  var m=mine(); m.nick=n; m.photo=pendingPhoto; m.goal=$('goalIn').value.trim().slice(0,60); if($('auraIn').checked)delete m.aura; else m.aura=false;
   closeSetup(); render(); saveMine();
 });
 
