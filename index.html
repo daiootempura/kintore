@@ -57,6 +57,9 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15p
 .aw canvas{position:absolute;left:50%;top:50%;width:320%;height:320%;transform:translate(-50%,-50%);pointer-events:none;z-index:1}
 .aw.sm .av{border-color:var(--aura);box-shadow:0 0 0 1.5px var(--aura)}
 .hint{display:none!important}
+.calopt{display:flex;justify-content:flex-end}
+.calopt .btn{min-height:30px;padding:2px 12px;font-size:12px}
+.calopt[hidden]{display:none}
 #ach{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.55)}
 #ach[hidden]{display:none}
 #prof{position:fixed;inset:0;z-index:15;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.55)}
@@ -346,6 +349,7 @@ input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
         </div>
       </div>
       <div class="grid" id="grid"></div>
+      <div class="calopt"><button class="btn" id="calZap" type="button" aria-pressed="true">カレンダーの稲妻を止める</button></div>
       <div class="tally" id="tally" aria-label="自分の継続日数"></div>
     </section>
 
@@ -446,7 +450,7 @@ input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
     </div>
   </div>
 </div>
-<p class="note" id="ver" style="text-align:center;flex:none;margin:0 0 4px">版 27</p>
+<p class="note" id="ver" style="text-align:center;flex:none;margin:0 0 4px">版 28</p>
 </div>
 
 <script type="module">
@@ -527,7 +531,7 @@ function avatar(uid,small,force){ // 選んだ写真。未設定なら名前の�
   if(!lv||(!aura&&!crown))return a;
   var w=el('span','aw '+(aura?'lv'+lv:'noaura')+(small?' sm':'')); w.setAttribute('aria-hidden','true');
   w.appendChild(a);
-  if(aura){var cv=document.createElement('canvas');cv.dataset.lv=lv;if(small)cv.dataset.sm='1';w.appendChild(cv);}
+  if(aura&&!(small&&calZapOff)){var cv=document.createElement('canvas');cv.dataset.lv=lv;if(small)cv.dataset.sm='1';w.appendChild(cv);}
   if(crown){ // 100kg: 王冠
     var cr=el('span','crown');
     cr.innerHTML='<svg viewBox="0 0 24 18"><path d="M2 15 L1 4 L7.5 9 L12 1.5 L16.5 9 L23 4 L22 15 Z" fill="#f5c518" stroke="#7a5600" stroke-width="1.3" stroke-linejoin="round"/><rect x="2" y="14.2" width="20" height="2.8" rx="1" fill="#e0a800" stroke="#7a5600" stroke-width="1.1"/><circle cx="12" cy="10.5" r="1.6" fill="#d7263d"/><circle cx="1" cy="4" r="1.4" fill="#f5c518" stroke="#7a5600" stroke-width=".8"/><circle cx="12" cy="1.5" r="1.4" fill="#f5c518" stroke="#7a5600" stroke-width=".8"/><circle cx="23" cy="4" r="1.4" fill="#f5c518" stroke="#7a5600" stroke-width=".8"/></svg>';
@@ -696,6 +700,17 @@ function renderLegend(){
     box.appendChild(c);
   });
 }
+var calZapOff=false; try{calZapOff=localStorage.getItem('mt_calzap')==='off';}catch(e){}  // この端末だけの設定
+function renderCalZap(){
+  var b=$('calZap'), any=!!document.querySelector('#grid .aw');
+  b.parentNode.hidden=!any;                      // 稲妻を付けている人がカレンダーにいないときは出さない
+  b.textContent=calZapOff?'カレンダーの稲妻を動かす':'カレンダーの稲妻を止める';
+  b.setAttribute('aria-pressed',calZapOff?'false':'true');
+}
+$('calZap').addEventListener('click',function(){
+  calZapOff=!calZapOff; try{localStorage.setItem('mt_calzap',calZapOff?'off':'on');}catch(e){}
+  renderCalendar(); $('calZap').focus();
+});
 function renderCalendar(){
   $('ym').textContent=vy+'年 '+(vm+1)+'月';
   var g=$('grid'); g.textContent='';
@@ -717,6 +732,7 @@ function renderCalendar(){
     b.addEventListener('click',function(){sel=k;render();});
     g.appendChild(b);
   })(d);}
+  renderCalZap();
 }
 function renderDay(){
   var p=sel.split('-'), dt=new Date(+p[0],+p[1]-1,+p[2]);
