@@ -1,13 +1,24 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // グループの合言葉（招待リンクの g=...）を知っている人だけが、そのグループのメンバーを読める。
+    // グループの合言葉（招待リンクの g=...）を知っている人だけが、そのグループを読める。
     // グループ一覧は誰も取得できないので、合言葉は推測されない限り漏れない。
-    match /groups/{groupId}/members/{userId} {
-      allow read: if request.auth != null;
-      // 書き込めるのは自分の記録だけ
-      allow create, update: if request.auth != null && request.auth.uid == userId;
-      allow delete: if false;
+    match /groups/{groupId} {
+      // 管理者の一覧。作った人が最初の管理者になり、管理者だけが管理者を追加・変更できる
+      allow get: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.admins == [request.auth.uid];
+      allow update: if request.auth != null && request.auth.uid in resource.data.admins;
+
+      match /members/{userId} {
+        allow read: if request.auth != null;
+        // 書き込めるのは自分の記録だけ
+        allow create, update: if request.auth != null && request.auth.uid == userId;
+        // 削除できるのは本人か、グループの管理者
+        allow delete: if request.auth != null && (
+          request.auth.uid == userId ||
+          request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.admins
+        );
+      }
     }
   }
 }

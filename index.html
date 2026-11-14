@@ -43,6 +43,14 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15p
 #tabs{display:flex;align-self:center;border:1px solid var(--line);border-radius:999px;padding:2px;flex:none}
 #tabs button{border:none;background:none;border-radius:999px;padding:4px 20px;min-height:34px}
 #tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);font-weight:700}
+.mrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;border-top:1px solid var(--line);padding-top:10px}
+.mrow .who{display:flex;align-items:center;gap:8px;min-width:0;flex:1 1 160px}
+.mrow .who div{display:flex;flex-direction:column;min-width:0}
+.mrow .who b{overflow-wrap:anywhere}
+.mrow .acts{display:flex;flex-wrap:wrap;gap:6px}
+.mrow .btn{min-height:32px;padding:2px 10px;font-size:13px}
+.btn.danger{border-color:var(--warn);color:var(--warn)}
+#adminBody{display:flex;flex-direction:column;gap:10px}
 .block{display:flex;flex-direction:column;gap:6px;border:1px solid var(--line);border-radius:10px;padding:10px}
 .block .bhead{display:flex;gap:6px;align-items:center}
 .block .bhead select{flex:1 1 auto}
@@ -276,6 +284,10 @@ input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
     <h2>メンバーと今月のトレーニング日数</h2>
     <div class="legend" id="legend"></div>
   </section>
+  <section class="card" id="adminCard" hidden aria-label="メンバーの管理">
+    <h2>メンバーの管理</h2>
+    <div id="adminBody"></div>
+  </section>
   <section class="card" id="cmpCard" aria-label="友達との差">
     <div class="cmphead">
       <h2>友達との差</h2>
@@ -302,7 +314,7 @@ input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
 import firebaseConfig from './config.js';
 import {initializeApp} from './vendor/firebase-app.js';
 import {getAuth,signInAnonymously} from './vendor/firebase-auth.js';
-import {getFirestore,collection,doc,setDoc,onSnapshot} from './vendor/firebase-firestore.js';
+import {getFirestore,collection,doc,setDoc,deleteDoc,onSnapshot} from './vendor/firebase-firestore.js';
 (function(){
 'use strict';
 var BASE_EX=['ベンチプレス','スクワット','デッドリフト','ショルダープレス','ラットプルダウン','懸垂','ベントオーバーロウ','アームカール','レッグプレス','ダンベルプレス'];
@@ -310,6 +322,8 @@ var DOW=['日','月','火','水','木','金','土'];
 
 var db=null, fs=null, gid='', myId=null, readOnly=false, sample=false;
 var members={};      // uid -> {nick, d:{date:{id:{ex,kg,reps,sets,t}}}}
+var allMembers={};   // 引き継ぎ済みで隠したものも含む全員（管理用）
+var admins=[], groupState='unknown', pendingDel='';  // groupState: unknown / none / ok
 var names={};        // uid -> profile name
 var now=new Date();
 var vy=now.getFullYear(), vm=now.getMonth();
@@ -358,13 +372,13 @@ function order(){ // 自分を先頭に、あとはID順
   });
 }
 function avatar(uid,small){ // 選んだ写真。未設定なら名前の頭文字
-  var m=members[uid]||{}, a=el('span','av'+(small?' sm':''));
+  var m=members[uid]||allMembers[uid]||{}, a=el('span','av'+(small?' sm':''));
   if(m.photo){var im=document.createElement('img');im.src=m.photo;im.alt='';a.appendChild(im);a.className+=' photo';}
   else{var n=(m.nick||names[uid]||'').trim();a.textContent=n?Array.from(n)[0]:'?';a.className+=' mono';}
   a.setAttribute('aria-hidden','true'); return a;
 }
 function nameOf(uid){
-  var m=members[uid]||{};
+  var m=members[uid]||allMembers[uid]||{};
   var n=m.nick||names[uid]||'';
   if(uid===myId)return n?n+'（自分）':'自分';
   return n||'メンバー';
@@ -554,7 +568,65 @@ function renderTally(){
     box.appendChild(d);
   });
 }
-function render(){renderTally();renderLegend();renderCalendar();renderDay();renderCompare();}
+/* ---------- メンバーの管理（管理者だけが、重複したアカウントなどを削除できる） ---------- */
+function saveAdmins(list){
+  return setDoc(doc(fs,'groups',gid),{admins:list,t:Date.now()}).catch(function(){
+    banner('管理者の設定を保存できませんでした。Firebase のルールが最新か確認してください。',true);
+  });
+}
+function renderAdmin(){
+  var card=$('adminCard'), box=$('adminBody'); box.textContent='';
+  if(sample||!gid||!myId||groupState==='unknown'){card.hidden=true;return;}
+  card.hidden=false;
+  if(groupState==='none'){
+    box.appendChild(el('p','note','このグループにはまだ管理者がいません。管理者になると、重複したアカウントを削除できます。'));
+    var b=el('button','btn','このグループの管理者になる'); b.type='button'; b.disabled=readOnly;
+    b.addEventListener('click',function(){saveAdmins([myId]);});
+    var w=el('div'); w.appendChild(b); box.appendChild(w); return;
+  }
+  var isAdmin=admins.indexOf(myId)>=0;
+  box.appendChild(el('p','note','管理者: '+admins.map(function(id){return (members[id]||allMembers[id])?nameOf(id):'（不明な端末）';}).join('、')));
+  if(!isAdmin){box.appendChild(el('p','note','アカウントが二重になったときは、管理者に古い方の削除を頼んでください。'));return;}
+  box.appendChild(el('p','note','二重になったアカウントや使われていないアカウントを削除できます。削除するとその人の記録も消え、元に戻せません。'));
+  var ids=Object.keys(allMembers).filter(function(id){return id!==myId;}).sort(function(a,b){
+    return (allMembers[a].nick||'').localeCompare(allMembers[b].nick||'','ja')||(allMembers[b].u-allMembers[a].u);
+  });
+  if(!ids.length){box.appendChild(el('p','note','自分以外のメンバーはまだいません。'));return;}
+  ids.forEach(function(id){
+    var m=allMembers[id], row=el('div','mrow'), who=el('div','who'), tx=el('div');
+    who.appendChild(avatar(id));
+    tx.appendChild(el('b',null,m.nick||'（名前未設定）'));
+    var dt=m.u?new Date(m.u):null;
+    tx.appendChild(el('span','note','記録 '+Object.keys(m.d).length+'日・最終更新 '+(dt?(dt.getMonth()+1)+'/'+dt.getDate():'不明')+(members[id]?'':'・引き継ぎ済み')+(admins.indexOf(id)>=0?'・管理者':'')));
+    who.appendChild(tx); row.appendChild(who);
+    var acts=el('div','acts');
+    if(pendingDel===id){
+      var yes=el('button','btn danger','本当に削除する'); yes.type='button';
+      yes.addEventListener('click',function(){
+        pendingDel='';
+        deleteDoc(doc(fs,'groups',gid,'members',id)).then(function(){
+          if(admins.indexOf(id)>=0)saveAdmins(admins.filter(function(x){return x!==id;}));
+          banner('アカウントを削除しました。');
+        }).catch(function(){banner('削除できませんでした。Firebase のルールが最新か確認してください。',true);});
+        renderAdmin();
+      });
+      var no=el('button','btn','やめる'); no.type='button';
+      no.addEventListener('click',function(){pendingDel='';renderAdmin();});
+      acts.appendChild(yes); acts.appendChild(no);
+    }else{
+      if(admins.indexOf(id)<0&&members[id]){
+        var mk=el('button','btn','管理者にする'); mk.type='button';
+        mk.addEventListener('click',function(){saveAdmins(admins.concat([id]));});
+        acts.appendChild(mk);
+      }
+      var del=el('button','btn danger','削除'); del.type='button'; del.setAttribute('aria-label',(m.nick||'名前未設定')+' のアカウントを削除');
+      del.addEventListener('click',function(){pendingDel=id;renderAdmin();});
+      acts.appendChild(del);
+    }
+    row.appendChild(acts); box.appendChild(row);
+  });
+}
+function render(){renderAdmin();renderTally();renderLegend();renderCalendar();renderDay();renderCompare();}
 
 function banner(text,warn){var b=$('banner');if(!text){b.hidden=true;return;}b.hidden=false;b.textContent=text;b.className='banner'+(warn?' warn':'');}
 function lock(){
@@ -851,9 +923,17 @@ function startGroup(){
   members={}; mine(); render();
   var loaded=false, setupChecked=false;
   var timer=setTimeout(function(){if(!loaded)banner('データをまだ読み込めていません。通信状況を確認してください。');},10000);
+  // グループの管理者。読めない場合（ルールが古いなど）は管理機能を出さない
+  onSnapshot(doc(fs,'groups',gid),function(snap){
+    var d=snap.exists()?snap.data():null;
+    admins=(d&&Array.isArray(d.admins))?d.admins.filter(function(x){return typeof x==='string';}):[];
+    groupState=admins.length?'ok':'none';
+    renderAdmin();
+  },function(){groupState='unknown';admins=[];renderAdmin();});
   onSnapshot(collection(fs,'groups',gid,'members'),function(snap){
     var next={};
     snap.docs.forEach(function(d){next[d.id]=clean(d.data());});
+    allMembers=Object.assign({},next);
     if(!next[myId])next[myId]=members[myId]||mine();
     hideReplaced(next);
     members=next;
@@ -875,6 +955,7 @@ $('makeGroup').addEventListener('click',function(){
   if(!myId||gid)return;
   gid=newCode();
   try{history.replaceState(null,'',location.pathname+'?g='+gid);}catch(e){}
+  setDoc(doc(fs,'groups',gid),{admins:[myId],t:Date.now()}).catch(function(){}); // 作った人が管理者
   startGroup();
 });
 $('inviteBtn').addEventListener('click',function(){
