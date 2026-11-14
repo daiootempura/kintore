@@ -93,6 +93,10 @@ button{font:inherit;color:inherit;cursor:pointer}
 #cropBox label{width:240px;max-width:100%}
 input[type="range"]{padding:0;border:none;background:none;min-height:28px;accent-color:var(--ink)}
 .gline{font-size:12px;color:var(--muted);padding-left:32px;overflow-wrap:anywhere}
+.setRows,#setRows{display:flex;flex-direction:column;gap:6px}
+.setRow{display:grid;grid-template-columns:22px minmax(0,1fr) auto minmax(0,1fr) auto auto;gap:6px;align-items:center}
+.setRow .no{font-family:var(--display);font-size:18px;font-weight:600;color:var(--muted);text-align:right}
+.setRow .u{font-size:13px;color:var(--muted);white-space:nowrap}
 .exTools{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
 #exPanel{display:flex;flex-direction:column;gap:8px;width:100%;border:1px solid var(--line);border-radius:8px;padding:10px}
 #exPanel[hidden]{display:none}
@@ -243,15 +247,8 @@ input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
             <div class="exMine" id="exMine"></div>
           </div>
         </div>
-        <label for="fKg">重量 (kg)
-          <input id="fKg" type="number" inputmode="decimal" min="0" max="999" step="0.5" required>
-        </label>
-        <label for="fReps">回数
-          <input id="fReps" type="number" inputmode="numeric" min="1" max="999" step="1" value="10" required>
-        </label>
-        <label for="fSets">セット
-          <input id="fSets" type="number" inputmode="numeric" min="1" max="99" step="1" value="3" required>
-        </label>
+        <div class="full" id="setRows" role="group" aria-label="セットごとの重量と回数"></div>
+        <button class="btn full" id="addSet" type="button">＋ セットを追加（前のセットと同じ内容）</button>
         <p class="note full" id="fPrev" aria-live="polite"></p>
         <button class="btn primary full" id="addBtn" type="submit">この日に記録する</button>
       </form>
@@ -534,7 +531,8 @@ function render(){renderTally();renderLegend();renderCalendar();renderDay();rend
 function banner(text,warn){var b=$('banner');if(!text){b.hidden=true;return;}b.hidden=false;b.textContent=text;b.className='banner'+(warn?' warn':'');}
 function lock(){
   readOnly=true;
-  ['fEx','fKg','fReps','fSets','addBtn','newEx','newExBtn'].forEach(function(id){$(id).disabled=true;});
+  ['fEx','addBtn','addSet','newEx','newExBtn'].forEach(function(id){$(id).disabled=true;});
+  renderRows();
   $('openSetup').hidden=true; closeSetup();
 }
 
@@ -583,19 +581,61 @@ $('exToggle').addEventListener('click',function(){
 });
 $('newExBtn').addEventListener('click',addExercise);
 $('newEx').addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();addExercise();}});
-function preview(){
-  var kg=num($('fKg').value), reps=Math.round(num($('fReps').value)), p=$('fPrev');
-  p.textContent=($('fKg').value!==''&&kg>0&&reps>=1)?'この記録の推定1RM: 約 '+fmtKg(e1rm(kg,reps))+' kg（1回だけ上げられる重さの目安）':'重量と回数を入れると、1回だけ上げられる重さの目安（推定1RM）が出ます。';
+/* セットをまとめて入力する行 */
+var rows=[{kg:'',reps:'10'}];
+function validRows(){
+  return rows.map(function(r){return {kg:num(r.kg),reps:Math.round(num(r.reps)),ok:r.kg!==''&&num(r.kg)>=0&&num(r.kg)<=999&&Math.round(num(r.reps))>=1&&Math.round(num(r.reps))<=999};})
+    .filter(function(r){return r.ok;});
 }
-$('fKg').addEventListener('input',preview); $('fReps').addEventListener('input',preview); preview();
+function preview(){
+  var v=validRows(), best=0;
+  v.forEach(function(r){if(r.kg>0)best=Math.max(best,e1rm(r.kg,r.reps));});
+  $('fPrev').textContent=best>0?'この記録の推定1RM: 約 '+fmtKg(best)+' kg（1回だけ上げられる重さの目安・'+v.length+'セット分を記録します）':'セットごとに重量と回数を入れると、まとめて記録できます。同じ内容のセットは「○セット」にまとめて保存します。';
+}
+function renderRows(focusLast){
+  var box=$('setRows'); box.textContent='';
+  rows.forEach(function(r,i){
+    var row=el('div','setRow');
+    row.appendChild(el('span','no',String(i+1)));
+    var kg=document.createElement('input'); kg.type='number'; kg.inputMode='decimal'; kg.min='0'; kg.max='999'; kg.step='0.5';
+    kg.id='kg'+i; kg.value=r.kg; kg.placeholder='重量'; kg.setAttribute('aria-label',(i+1)+'セット目の重量（kg）'); kg.disabled=readOnly;
+    kg.addEventListener('input',function(){r.kg=kg.value;preview();});
+    var rp=document.createElement('input'); rp.type='number'; rp.inputMode='numeric'; rp.min='1'; rp.max='999'; rp.step='1';
+    rp.id='reps'+i; rp.value=r.reps; rp.placeholder='回数'; rp.setAttribute('aria-label',(i+1)+'セット目の回数'); rp.disabled=readOnly;
+    rp.addEventListener('input',function(){r.reps=rp.value;preview();});
+    row.appendChild(kg); row.appendChild(el('span','u','kg ×')); row.appendChild(rp); row.appendChild(el('span','u','回'));
+    var x=el('button','x','削除'); x.type='button'; x.setAttribute('aria-label',(i+1)+'セット目を削除');
+    x.disabled=readOnly||rows.length<2; x.style.visibility=rows.length<2?'hidden':'visible';
+    x.addEventListener('click',function(){rows.splice(i,1);renderRows();preview();});
+    row.appendChild(x);
+    box.appendChild(row);
+  });
+  if(focusLast){var last=$('kg'+(rows.length-1));if(last){last.focus();last.select();}}
+}
+$('addSet').addEventListener('click',function(){
+  if(readOnly)return;
+  if(rows.length>=20){banner('一度に入力できるのは20セットまでです。',true);return;}
+  var p=rows[rows.length-1]; rows.push({kg:p.kg,reps:p.reps}); renderRows(true); preview();
+});
+renderRows(); preview();
 $('form').addEventListener('submit',function(ev){
   ev.preventDefault(); if(readOnly||!myId)return;
-  var ex=$('fEx').value.trim().slice(0,40), kg=num($('fKg').value), reps=Math.round(num($('fReps').value)), sets=Math.round(num($('fSets').value));
-  if(!ex||$('fKg').value===''||kg<0||kg>999||reps<1||sets<1)return;
-  addEntry(sel,ex,kg,reps,sets);
-  $('cmpEx').value=ex; renderCompare();
-  $('fKg').value=''; preview(); $('fKg').focus();
+  var ex=$('fEx').value.trim().slice(0,40), v=validRows();
+  if(!ex)return;
+  if(!v.length){var f=$('kg0');if(f)f.focus();return;}
+  // 同じ重量・回数のセットは1つの記録にまとめ、セット数として保存する
+  var groups=[], idx={};
+  v.forEach(function(r){var k=r.kg+'|'+r.reps;if(idx[k]===undefined){idx[k]=groups.length;groups.push({kg:r.kg,reps:r.reps,sets:1});}else groups[idx[k]].sets++;});
+  var m=mine(); if(!m.d[sel])m.d[sel]={};
+  var now=Date.now();
+  groups.forEach(function(g,i){
+    var id='e'+(now+i).toString(36)+Math.random().toString(36).slice(2,6);
+    m.d[sel][id]={ex:ex,kg:g.kg,reps:g.reps,sets:g.sets,t:now+i};
+  });
+  rows=[{kg:'',reps:rows[rows.length-1].reps||'10'}]; renderRows(); preview();
+  render(); $('cmpEx').value=ex; renderCompare(); saveMine();
 });
+
 /* ---------- 初期設定（アイコンと名前） ---------- */
 var pendingPhoto='';
 function showPrev(){
