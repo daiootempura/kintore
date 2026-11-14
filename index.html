@@ -877,7 +877,7 @@ $('form').addEventListener('submit',function(ev){
       var st=state.get(cv); if(!st){st={bolts:[],next:now+rnd(600,2600),end:0};state.set(cv,st);}
       var lv=+cv.dataset.lv||1, u=dpr, R=box.width/2*dpr;
       // ときどき激しくなる（レベルが高いほど頻繁に、長く）
-      if(now>st.next){st.end=now+rnd(700,1100)+lv*150;st.next=st.end+rnd(3200,6000)-lv*450;}
+      if(now>st.next){st.end=now+rnd(1100,1600)+lv*200;st.next=st.end+rnd(3600,6500)-lv*450;}
       var surge=now<st.end;
       if(surge!==st.was){st.was=surge;wrap.classList.toggle('surge',surge);}
       for(var k=st.bolts.length-1;k>=0;k--){if(--st.bolts[k].life<=0)st.bolts.splice(k,1);}
@@ -907,7 +907,7 @@ $('form').addEventListener('submit',function(ev){
     },500);
   }else{
     var last=0;
-    (function loop(t){ if(t-last>120){last=t;frame(t);} requestAnimationFrame(loop); })(0);
+    (function loop(t){ if(t-last>200){last=t;frame(t);} requestAnimationFrame(loop); })(0);
   }
 })();
 
