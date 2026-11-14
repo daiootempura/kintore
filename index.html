@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>筋トレ共有カレンダー</title>
+<meta name="theme-color" content="#111111">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="筋トレ共有">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* レイアウト: 左にカレンダー、右に選んだ日の記録。下に種目別の「友達との差」。
+   白黒を基本にし、メンバーは色ではなくアイコンと名前で見分ける。 */
+:root{
+  --bg:#ffffff; --surface:#ffffff; --ink:#111111; --muted:#6b6b6b; --line:#d9d9d9;
+  --accent:#111111; --accent-ink:#ffffff; --warn:#b3261e;
+  --display:"Barlow Condensed","Zen Kaku Gothic New",sans-serif;
+  --body:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0d0d0d; --surface:#0d0d0d; --ink:#f2f2f2; --muted:#9a9a9a; --line:#333333;
+    --accent:#f2f2f2; --accent-ink:#111111; --warn:#ff8a80; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0d0d0d; --surface:#0d0d0d; --ink:#f2f2f2; --muted:#9a9a9a; --line:#333333;
+  --accent:#f2f2f2; --accent-ink:#111111; --warn:#ff8a80; color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.6}
+.wrap{max-width:1040px;margin:0 auto;padding:20px 16px 48px;display:flex;flex-direction:column;gap:16px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+h1{font-size:22px;margin:0;font-weight:700;letter-spacing:.02em}
+h2{font-size:16px;margin:0;font-weight:700}
+.note{font-size:13px;color:var(--muted);margin:0}
+.banner{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:8px;padding:10px 12px;font-size:13px}
+.banner.warn{border-left-color:var(--warn)}
+.banner[hidden]{display:none}
+.legend{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:3px 10px 3px 8px;font-size:13px}
+.dot{width:10px;height:10px;border-radius:50%;flex:none;display:inline-block}
+.chip b{font-family:var(--display);font-size:16px;font-weight:600;font-variant-numeric:tabular-nums}
+.main{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:760px){.main{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.calhead{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.calhead .ym{font-family:var(--display);font-size:26px;font-weight:700;letter-spacing:.02em;font-variant-numeric:tabular-nums}
+button{font:inherit;color:inherit;cursor:pointer}
+.btn{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:6px 12px;min-height:36px}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.dow{font-size:12px;color:var(--muted);text-align:center;padding:2px 0}
+.day{background:transparent;border:1px solid var(--line);border-radius:8px;min-height:56px;padding:4px 4px 6px;display:flex;flex-direction:column;align-items:center;gap:4px}
+.day.blank{border:none;visibility:hidden}
+.day .n{font-family:var(--display);font-size:18px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums}
+.day.today .n{color:var(--accent);text-decoration:underline;text-underline-offset:3px}
+.day.sel{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.day .dots{display:flex;flex-wrap:wrap;justify-content:center;gap:2px}
+.day .dots .dot{width:8px;height:8px}
+.tally{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;border-top:1px dashed var(--line);padding-top:12px}
+.tally[hidden]{display:none}
+.tally div{display:flex;flex-direction:column;gap:0;border-left:2px solid var(--ink);padding-left:10px;min-width:0}
+.tally span{font-size:12px;color:var(--muted)}
+.tally b{font-family:var(--display);font-size:32px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums}
+.tally b small{font-family:var(--body);font-size:13px;font-weight:500;margin-left:3px}
+.av{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;border:1px solid var(--ink);font-size:15px;line-height:1;flex:none;font-weight:700}
+.av.mono{font-size:12px}
+.av.sm{width:16px;height:16px;font-size:12px;border:none}
+.av.sm.mono{border:1px solid var(--ink);font-size:9px}
+.av.photo{border:1px solid var(--line);overflow:hidden;padding:0}
+.av img{width:100%;height:100%;object-fit:cover;display:block}
+.av.sm.photo{width:18px;height:18px}
+.photoRow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.photoRow label.btn{flex-direction:row;align-items:center;color:var(--ink);font-size:15px;cursor:pointer;position:relative;overflow:hidden}
+/* ファイル選択はボタン全面に透明で重ね、直接タップさせる（ラベル経由より確実） */
+.photoRow label.btn input[type="file"]{position:absolute;inset:0;width:100%;height:100%;min-height:0;padding:0;border:none;opacity:0;cursor:pointer;font-size:0}
+.photoRow label.btn:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+#photoPrev .av{width:48px;height:48px;font-size:26px}
+#cropBox{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+#cropBox[hidden]{display:none}
+#cropCv{width:240px;max-width:100%;aspect-ratio:1;border-radius:50%;border:1px solid var(--ink);touch-action:none;cursor:grab;display:block}
+#cropBox label{width:240px;max-width:100%}
+input[type="range"]{padding:0;border:none;background:none;min-height:28px;accent-color:var(--ink)}
+.gline{font-size:12px;color:var(--muted);padding-left:32px;overflow-wrap:anywhere}
+.tap{cursor:pointer;border-radius:6px}
+.tap:hover{opacity:.7}
+.card[hidden]{display:none}
+#noGroup{max-width:480px;width:100%;margin:0 auto}
+body.nogroup .main,body.nogroup #cmpCard,body.nogroup #legend,body.nogroup #openSetup,body.nogroup #inviteBtn{display:none}
+.hbtns{display:flex;gap:8px;flex-wrap:wrap}
+#takeover{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line);padding-top:12px}
+#takeover[hidden]{display:none}
+#takeover .list{display:flex;flex-wrap:wrap;gap:8px}
+#takeover .list button{display:inline-flex;align-items:center;gap:6px}
+#setup{display:none;max-width:480px;width:100%;margin:0 auto}
+body.setup-open #setup{display:flex}
+body.setup-open .main,body.setup-open #cmpCard,body.setup-open #legend,body.setup-open #openSetup{display:none}
+.setupForm{display:flex;flex-direction:column;gap:12px;border-top:none;padding-top:0}
+.icons{display:flex;flex-wrap:wrap;gap:6px}
+.icons button{width:40px;height:40px;border-radius:50%;border:1px solid var(--line);background:var(--surface);font-size:20px;line-height:1;padding:0}
+.icons button[aria-pressed="true"]{border:2px solid var(--ink)}
+.icons button:disabled{opacity:.5;cursor:not-allowed}
+.person{display:flex;flex-direction:column;gap:6px;padding-top:10px;border-top:1px solid var(--line)}
+.person:first-of-type{border-top:none;padding-top:0}
+.pname{display:flex;align-items:center;gap:6px;font-weight:700;font-size:14px}
+.entry{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;padding-left:16px}
+.entry .ex{flex:1 1 120px;min-width:0;overflow-wrap:anywhere}
+.entry .kg{font-family:var(--display);font-size:20px;font-weight:600;font-variant-numeric:tabular-nums}
+.entry .rs{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.entry .rm{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.goal{display:flex;flex-direction:column;gap:2px;border-top:1px solid var(--line);padding-top:10px;font-size:13px}
+.goal b{font-family:var(--display);font-size:20px;font-weight:600}
+.diff{font-size:12px;border:1px solid var(--line);border-radius:999px;padding:0 8px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.diff.up{border-color:var(--ink);font-weight:700}
+.x{border:none;background:none;color:var(--muted);padding:0 6px;min-height:28px;border-radius:6px}
+.x:hover{color:var(--warn)}
+.empty{color:var(--muted);font-size:13px;padding-left:16px}
+form{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;border-top:1px solid var(--line);padding-top:12px}
+form .full{grid-column:1/-1}
+label{display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--muted)}
+input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:6px 8px;min-height:36px;width:100%;min-width:0}
+.cmphead{display:flex;flex-wrap:wrap;align-items:center;gap:8px;justify-content:space-between}
+.cmphead .ctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.cmphead select{width:auto;max-width:100%}
+.bars{display:flex;flex-direction:column;gap:8px}
+.bar{display:grid;grid-template-columns:minmax(72px,120px) minmax(48px,1fr) auto;gap:8px;align-items:center}
+.bar .who{font-size:13px;overflow-wrap:anywhere;display:flex;align-items:center;gap:6px}
+.track{background:var(--line);border-radius:6px;height:18px;overflow:hidden}
+.fill{height:100%;border-radius:6px;min-width:2px;background:var(--ink)}
+.fill.other{background:var(--muted)}
+.bar .val{display:flex;flex-direction:column;gap:2px;align-items:flex-end}
+.bar .val b{font-family:var(--display);font-size:20px;font-weight:600;font-variant-numeric:tabular-nums}
+.nick{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end}
+.nick label{flex:1 1 160px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>筋トレ共有カレンダー</h1>
+      <p class="note">日付を選んで種目と重量を記録すると、友達の記録と並べて差を確認できます。</p>
+    </div>
+    <div class="legend" id="legend" aria-label="メンバーと今月のトレーニング日数"></div>
+    <div class="hbtns">
+      <button class="btn" id="inviteBtn" type="button" hidden>招待リンクをコピー</button>
+      <button class="btn" id="openSetup" type="button" hidden>設定</button>
+    </div>
+  </header>
+  <div class="banner" id="banner" hidden></div>
+
+  <section class="card" id="noGroup" hidden>
+    <h2>グループを作りましょう</h2>
+    <p class="note">友達から招待リンクを受け取っている場合は、ここでは作らずに、そのリンクから開いてください。</p>
+    <p class="note">新しく始める場合は、下のボタンでグループを作り、できた招待リンクを友達に送ります。</p>
+    <div><button class="btn primary" id="makeGroup" type="button">新しいグループを作る</button></div>
+  </section>
+
+  <section class="card" id="setup" aria-labelledby="setupTitle">
+    <h2 id="setupTitle"></h2>
+    <p class="note">友達の画面には、ここで決めたアイコンと名前で表示されます。あとから「設定」で変えられます。</p>
+    <form id="setupForm" class="setupForm">
+      <div class="photoRow">
+        <span id="photoPrev"></span>
+        <label class="btn">写真から選ぶ<input type="file" id="photoIn" accept="image/*" aria-label="写真から選ぶ"></label>
+        <button class="btn" id="photoClear" type="button" hidden>写真を外す</button>
+      </div>
+      <div id="cropBox" hidden>
+        <canvas id="cropCv" width="240" height="240" tabindex="0" aria-label="アイコンにする範囲。ドラッグか矢印キーで位置を動かせます"></canvas>
+        <label for="cropZoom">拡大
+          <input id="cropZoom" type="range" min="1" max="4" step="0.01" value="1">
+        </label>
+        <p class="note">写真をドラッグして、丸の中に入れたい所を合わせてください。</p>
+      </div>
+      <p class="note">丸の中に見えている範囲が、小さく縮小されてアイコンになります。写真を選ばない場合は名前の頭文字がアイコンになります。</p>
+      <label for="nickIn">名前
+        <input id="nickIn" maxlength="20" required placeholder="例: ケン">
+      </label>
+      <label for="goalIn">目標（友達にも表示されます）
+        <input id="goalIn" maxlength="60" placeholder="例: 年内にベンチプレス100kg">
+      </label>
+      <div class="photoRow">
+        <button class="btn primary" id="setupGo" type="submit">はじめる</button>
+        <button class="btn" id="setupBack" type="button">戻る</button>
+      </div>
+    </form>
+    <div id="takeover" hidden>
+      <p class="note">機種変更などで以前から参加していた方は、下から以前の自分を選ぶと、記録とプロフィールを引き継げます。</p>
+      <div class="list" id="takeList"></div>
+    </div>
+    <p class="note" id="homeHint">ホーム画面に追加して使う場合は、先に追加してから、そのアイコンで開いて設定してください（ブラウザとホーム画面のアプリは別の人として扱われます）。</p>
+  </section>
+
+  <div class="main">
+    <section class="card" aria-label="カレンダー">
+      <div class="calhead">
+        <button class="btn" id="prev" type="button" aria-label="前の月">←</button>
+        <div class="ym" id="ym"></div>
+        <div style="display:flex;gap:6px">
+          <button class="btn" id="todayBtn" type="button">今日</button>
+          <button class="btn" id="next" type="button" aria-label="次の月">→</button>
+        </div>
+      </div>
+      <div class="grid" id="grid"></div>
+      <div class="tally" id="tally" aria-label="自分の継続日数"></div>
+    </section>
+
+    <section class="card" aria-label="選んだ日の記録">
+      <h2 id="dayTitle"></h2>
+      <div id="dayList"></div>
+      <form id="form" autocomplete="off">
+        <label class="full" for="fEx">種目
+          <input id="fEx" list="exList" required maxlength="40" placeholder="例: ベンチプレス">
+        </label>
+        <datalist id="exList"></datalist>
+        <label for="fKg">重量 (kg)
+          <input id="fKg" type="number" inputmode="decimal" min="0" max="999" step="0.5" required>
+        </label>
+        <label for="fReps">回数
+          <input id="fReps" type="number" inputmode="numeric" min="1" max="999" step="1" value="10" required>
+        </label>
+        <label for="fSets">セット
+          <input id="fSets" type="number" inputmode="numeric" min="1" max="99" step="1" value="3" required>
+        </label>
+        <p class="note full" id="fPrev" aria-live="polite"></p>
+        <button class="btn primary full" id="addBtn" type="submit">この日に記録する</button>
+      </form>
+    </section>
+  </div>
+
+  <section class="card" id="cmpCard" aria-label="友達との差">
+    <div class="cmphead">
+      <h2>友達との差</h2>
+      <div class="ctl">
+        <label for="cmpEx" style="flex-direction:row;align-items:center;gap:6px">種目
+          <select id="cmpEx"></select>
+        </label>
+        <label for="cmpMetric" style="flex-direction:row;align-items:center;gap:6px">指標
+          <select id="cmpMetric"><option value="rm">推定1RM</option><option value="kg">最高重量</option></select>
+        </label>
+        <label for="cmpScope" style="flex-direction:row;align-items:center;gap:6px">期間
+          <select id="cmpScope"><option value="all">全期間</option><option value="month">表示中の月</option></select>
+        </label>
+      </div>
+    </div>
+    <div class="bars" id="bars"></div>
+  </section>
+
+</div>
+
+<script type="module">
+import firebaseConfig from './config.js';
+import {initializeApp} from './vendor/firebase-app.js';
+import {getAuth,signInAnonymously} from './vendor/firebase-auth.js';
+import {getFirestore,collection,doc,setDoc,onSnapshot} from './vendor/firebase-firestore.js';
+(function(){
+'use strict';
+var BASE_EX=['ベンチプレス','スクワット','デッドリフト','ショルダープレス','ラットプルダウン','懸垂','ベントオーバーロウ','アームカール','レッグプレス','ダンベルプレス'];
+var DOW=['日','月','火','水','木','金','土'];
+
+var db=null, fs=null, gid='', myId=null, readOnly=false, sample=false;
+var members={};      // uid -> {nick, d:{date:{id:{ex,kg,reps,sets,t}}}}
+var names={};        // uid -> profile name
+var now=new Date();
+var vy=now.getFullYear(), vm=now.getMonth();
+var sel=key(now);
+
+function $(id){return document.getElementById(id);}
+function pad(n){return (n<10?'0':'')+n;}
+function key(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
+function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
+function num(v){v=Number(v);return isFinite(v)?v:0;}
+function fmtKg(v){return (Math.round(v*10)/10).toString();}
+// 推定1RM（Epleyの式）: 重量 × (1 + 回数/30)。1回ならその重量そのもの。
+function e1rm(kg,reps){reps=Math.max(1,reps);return reps<=1?kg:kg*(1+reps/30);}
+// 目標の1RMに届くために、その重量で必要な回数
+function repsFor(goal,kg){if(kg<=0)return null;if(kg>=goal)return 1;return Math.ceil(30*(goal/kg-1)-1e-9);}
+
+function clean(raw){ // 共有データは信用せず、形を整えてから使う
+  var out={nick:'',photo:'',goal:'',u:0,rep:{},d:{}};
+  if(!raw||typeof raw!=='object')return out;
+  if(typeof raw.nick==='string')out.nick=raw.nick.slice(0,20);
+  if(typeof raw.goal==='string')out.goal=raw.goal.trim().slice(0,60);
+  out.u=num(raw.u);
+  if(raw.rep&&typeof raw.rep==='object')Object.keys(raw.rep).forEach(function(id){if(/^[A-Za-z0-9]{1,128}$/.test(id))out.rep[id]=num(raw.rep[id]);});
+  if(typeof raw.photo==='string'&&raw.photo.length<=60000&&/^data:image\/jpeg;base64,[A-Za-z0-9+\/=]+$/.test(raw.photo))out.photo=raw.photo;
+  var d=raw.d;
+  if(d&&typeof d==='object'){
+    Object.keys(d).forEach(function(date){
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(date))return;
+      var day=d[date]; if(!day||typeof day!=='object')return;
+      var o={};
+      Object.keys(day).forEach(function(id){
+        var e=day[id]; if(!e||typeof e!=='object'||typeof e.ex!=='string')return;
+        var ex=e.ex.trim().slice(0,40); if(!ex)return;
+        o[id]={ex:ex,kg:num(e.kg),reps:num(e.reps),sets:num(e.sets),t:num(e.t)};
+      });
+      if(Object.keys(o).length)out.d[date]=o;
+    });
+  }
+  return out;
+}
+
+function order(){ // 自分を先頭に、あとはID順
+  return Object.keys(members).sort(function(a,b){
+    if(a===myId)return -1; if(b===myId)return 1; return a<b?-1:a>b?1:0;
+  });
+}
+function avatar(uid,small){ // 選んだ写真。未設定なら名前の頭文字
+  var m=members[uid]||{}, a=el('span','av'+(small?' sm':''));
+  if(m.photo){var im=document.createElement('img');im.src=m.photo;im.alt='';a.appendChild(im);a.className+=' photo';}
+  else{var n=(m.nick||names[uid]||'').trim();a.textContent=n?Array.from(n)[0]:'?';a.className+=' mono';}
+  a.setAttribute('aria-hidden','true'); return a;
+}
+function nameOf(uid){
+  var m=members[uid]||{};
+  var n=m.nick||names[uid]||'';
+  if(uid===myId)return n?n+'（自分）':'自分';
+  return n||'メンバー';
+}
+function linkMine(node,uid){ // 自分のアイコン・名前を押すとプロフィール（設定）へ
+  if(uid!==myId||readOnly||sample||!db||!gid)return;
+  node.className+=' tap'; node.setAttribute('role','button'); node.tabIndex=0;
+  node.setAttribute('aria-label','自分のプロフィールを開く');
+  node.addEventListener('click',function(){openSetup(false);window.scrollTo(0,0);});
+  node.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();openSetup(false);window.scrollTo(0,0);}});
+}
+function entries(uid,date){
+  var day=(members[uid]&&members[uid].d[date])||{};
+  return Object.keys(day).map(function(id){var e=day[id];return {id:id,ex:e.ex,kg:e.kg,reps:e.reps,sets:e.sets,t:e.t};})
+    .sort(function(a,b){return a.t-b.t;});
+}
+function best(uid,ex,prefix,est){ // その種目の最高重量（est なら推定1RMの最高）。記録なしは null
+  var m=members[uid]; if(!m)return null; var b=null;
+  Object.keys(m.d).forEach(function(date){
+    if(prefix&&date.indexOf(prefix)!==0)return;
+    var day=m.d[date];
+    Object.keys(day).forEach(function(id){if(day[id].ex!==ex)return;var v=est?e1rm(day[id].kg,day[id].reps):day[id].kg;if(b===null||v>b)b=v;});
+  });
+  return b;
+}
+function allExercises(){
+  var s={};
+  Object.keys(members).forEach(function(u){var d=members[u].d;Object.keys(d).forEach(function(k){Object.keys(d[k]).forEach(function(id){s[d[k][id].ex]=1;});});});
+  return Object.keys(s).sort(function(a,b){return a.localeCompare(b,'ja');});
+}
+function diffChip(delta,label){
+  var c=el('span','diff'+(delta>0?' up':''));
+  c.textContent=(label||'')+(delta===0?'同じ':(delta>0?'+':'−')+fmtKg(Math.abs(delta))+' kg');
+  return c;
+}
+
+/* ---------- 描画 ---------- */
+function renderLegend(){
+  var box=$('legend'); box.textContent='';
+  var prefix=vy+'-'+pad(vm+1);
+  order().forEach(function(uid){
+    var days=Object.keys(members[uid].d).filter(function(k){return k.indexOf(prefix)===0;}).length;
+    var c=el('span','chip');
+    c.appendChild(avatar(uid)); c.appendChild(el('span',null,nameOf(uid))); linkMine(c,uid);
+    c.appendChild(el('b',null,String(days))); c.appendChild(el('span',null,'日'));
+    box.appendChild(c);
+  });
+}
+function renderCalendar(){
+  $('ym').textContent=vy+'年 '+(vm+1)+'月';
+  var g=$('grid'); g.textContent='';
+  DOW.forEach(function(d){g.appendChild(el('div','dow',d));});
+  var first=new Date(vy,vm,1).getDay(), n=new Date(vy,vm+1,0).getDate(), tk=key(new Date());
+  for(var i=0;i<first;i++)g.appendChild(el('div','day blank'));
+  var ids=order();
+  for(var d=1;d<=n;d++){(function(d){
+    var k=vy+'-'+pad(vm+1)+'-'+pad(d);
+    var b=el('button','day'+(k===tk?' today':'')+(k===sel?' sel':'')); b.type='button';
+    b.appendChild(el('span','n',String(d)));
+    var dots=el('span','dots'), who=[];
+    ids.forEach(function(uid){
+      if(members[uid].d[k]){dots.appendChild(avatar(uid,true));who.push(nameOf(uid));}
+    });
+    b.appendChild(dots);
+    b.setAttribute('aria-label',(vm+1)+'月'+d+'日'+(who.length?'、記録あり: '+who.join('、'):''));
+    if(k===sel)b.setAttribute('aria-pressed','true');
+    b.addEventListener('click',function(){sel=k;render();});
+    g.appendChild(b);
+  })(d);}
+}
+function renderDay(){
+  var p=sel.split('-'), dt=new Date(+p[0],+p[1]-1,+p[2]);
+  $('dayTitle').textContent=(+p[1])+'月'+(+p[2])+'日（'+DOW[dt.getDay()]+'）の記録';
+  var list=$('dayList'); list.textContent='';
+  var ids=order();
+  if(!ids.length){list.appendChild(el('p','note','まだ誰も記録していません。下のフォームから最初の記録を入れてください。'));}
+  ids.forEach(function(uid){
+    var box=el('div','person'), head=el('div','pname');
+    head.appendChild(avatar(uid)); head.appendChild(el('span',null,nameOf(uid))); linkMine(head,uid); box.appendChild(head);
+    if(members[uid].goal)box.appendChild(el('div','gline','目標: '+members[uid].goal));
+    var es=entries(uid,sel);
+    if(!es.length)box.appendChild(el('div','empty','この日の記録はありません'));
+    es.forEach(function(e){
+      var row=el('div','entry');
+      row.appendChild(el('span','ex',e.ex));
+      row.appendChild(el('span','kg',fmtKg(e.kg)+' kg'));
+      row.appendChild(el('span','rs',e.reps+'回 × '+e.sets+'セット'));
+      row.appendChild(el('span','rm','推定1RM '+fmtKg(e1rm(e.kg,e.reps))+' kg'));
+      if(uid!==myId&&myId){
+        var mine=best(myId,e.ex,null,true);
+        if(mine!==null)row.appendChild(diffChip(e1rm(e.kg,e.reps)-mine,'自分の推定1RM比 '));
+      }
+      if(uid===myId&&!readOnly){
+        var x=el('button','x','削除'); x.type='button';
+        x.setAttribute('aria-label',e.ex+' の記録を削除');
+        x.addEventListener('click',function(){removeEntry(sel,e.id);});
+        row.appendChild(x);
+      }
+      box.appendChild(row);
+    });
+    list.appendChild(box);
+  });
+  var dl=$('exList'); dl.textContent='';
+  var seen={};
+  allExercises().concat(BASE_EX).forEach(function(x){if(seen[x])return;seen[x]=1;var o=document.createElement('option');o.value=x;dl.appendChild(o);});
+}
+function renderCompare(){
+  var s=$('cmpEx'), cur=s.value, exs=allExercises();
+  s.textContent='';
+  exs.forEach(function(x){var o=document.createElement('option');o.value=x;o.textContent=x;s.appendChild(o);});
+  if(exs.indexOf(cur)>=0)s.value=cur;
+  var box=$('bars'); box.textContent='';
+  if(!exs.length){box.appendChild(el('p','note','記録が入ると、ここに種目ごとの最高重量と差が並びます。'));return;}
+  var ex=s.value, prefix=$('cmpScope').value==='month'?vy+'-'+pad(vm+1):null, est=$('cmpMetric').value==='rm';
+  var rows=order().map(function(uid){return {uid:uid,b:best(uid,ex,prefix,est)};});
+  var max=0; rows.forEach(function(r){if(r.b!==null&&r.b>max)max=r.b;});
+  var mine=myId?best(myId,ex,prefix,est):null;
+  rows.forEach(function(r){
+    var row=el('div','bar');
+    var who=el('span','who'); who.appendChild(avatar(r.uid)); who.appendChild(el('span',null,nameOf(r.uid))); linkMine(who,r.uid); row.appendChild(who);
+    var tr=el('div','track'), f=el('div','fill');
+    if(r.uid!==myId)f.className='fill other'; f.style.width=(r.b!==null&&max>0?Math.max(2,r.b/max*100):0)+'%';
+    if(r.b===null)f.style.display='none';
+    tr.appendChild(f); row.appendChild(tr);
+    var v=el('span','val');
+    if(r.b===null){v.appendChild(el('span','note','記録なし'));}
+    else{
+      v.appendChild(el('b',null,fmtKg(r.b)+' kg'));
+      if(r.uid!==myId&&mine!==null)v.appendChild(diffChip(r.b-mine,'自分との差 '));
+    }
+    row.appendChild(v); box.appendChild(row);
+  });
+  if(est)box.appendChild(el('p','note','推定1RM = 重量 ×（1 + 回数 ÷ 30）。回数が10回を超える記録では誤差が大きくなります。'));
+  if(myId&&mine===null)box.appendChild(el('p','note','自分がこの種目を記録すると、友達との差が表示されます。'));
+  var rm=myId?best(myId,ex,null,true):null, top=myId?best(myId,ex,null,false):null;
+  if(rm!==null&&top>0){
+    var goal=Math.floor(rm/10)*10+10, parts=[];
+    [top,top+2.5,top+5].forEach(function(w){if(w>=goal)return;var r=repsFor(goal,w);if(r&&r<=12)parts.push(fmtKg(w)+' kg を '+r+'回');});
+    var g=el('div','goal');
+    g.appendChild(el('b',null,'次の目安 '+goal+' kg'));
+    g.appendChild(el('span',null,'いまの推定1RMは '+fmtKg(rm)+' kg。'+(parts.length?parts.join('、または ')+' 上げられれば、'+goal+' kg が1回上がる計算です。':'扱う重量を上げていくと '+goal+' kg に近づきます。')));
+    box.appendChild(g);
+  }
+}
+function countDays(uid,prefix){return Object.keys(members[uid].d).filter(function(k){return k.indexOf(prefix)===0;}).length;}
+function renderTally(){
+  var box=$('tally'); box.textContent='';
+  if(!myId||!members[myId]){box.hidden=true;return;}
+  box.hidden=false;
+  [[(vm+1)+'月のトレーニング',countDays(myId,vy+'-'+pad(vm+1))],[vy+'年の合計',countDays(myId,vy+'-')],['これまでの通算',countDays(myId,'')]].forEach(function(t){
+    var d=el('div'); d.appendChild(el('span',null,t[0]));
+    var b=el('b',null,String(t[1])); b.appendChild(el('small',null,'日')); d.appendChild(b);
+    box.appendChild(d);
+  });
+}
+function render(){renderTally();renderLegend();renderCalendar();renderDay();renderCompare();}
+
+function banner(text,warn){var b=$('banner');if(!text){b.hidden=true;return;}b.hidden=false;b.textContent=text;b.className='banner'+(warn?' warn':'');}
+function lock(){
+  readOnly=true;
+  ['fEx','fKg','fReps','fSets','addBtn'].forEach(function(id){$(id).disabled=true;});
+  $('openSetup').hidden=true; closeSetup();
+}
+
+/* ---------- 保存（自分の分だけを、1回ずつ順番に書く） ---------- */
+var queue=Promise.resolve();
+function saveMine(){
+  if(sample||!db||!myId||!gid)return;
+  var body=JSON.parse(JSON.stringify(members[myId])); body.u=Date.now();
+  queue=queue.then(function(){return setDoc(doc(fs,'groups',gid,'members',myId),body);}).then(function(){
+    if(!readOnly)banner('');
+  }).catch(function(e){
+    var code=e&&e.code;
+    if(code==='permission-denied'||code==='unauthenticated'){
+      lock();
+      banner('保存できませんでした。このグループに書き込む権限がありません。招待リンクから開き直してください。',true);
+    }else if(code==='resource-exhausted'){
+      banner('保存できませんでした。今日の利用上限に達した可能性があります。時間をおいてもう一度お試しください。',true);
+    }else{
+      banner('保存に失敗しました。通信状況を確認して、もう一度記録してください。',true);
+    }
+  });
+}
+function mine(){if(!members[myId])members[myId]={nick:'',photo:'',goal:'',u:0,rep:{},d:{}};return members[myId];}
+function addEntry(date,ex,kg,reps,sets){
+  var m=mine(); if(!m.d[date])m.d[date]={};
+  var id='e'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+  m.d[date][id]={ex:ex,kg:kg,reps:reps,sets:sets,t:Date.now()};
+  render(); saveMine();
+}
+function removeEntry(date,id){
+  var m=mine(); if(!m.d[date])return;
+  delete m.d[date][id]; if(!Object.keys(m.d[date]).length)delete m.d[date];
+  render(); saveMine();
+}
+
+/* ---------- 操作 ---------- */
+$('prev').addEventListener('click',function(){vm--;if(vm<0){vm=11;vy--;}render();});
+$('next').addEventListener('click',function(){vm++;if(vm>11){vm=0;vy++;}render();});
+$('todayBtn').addEventListener('click',function(){var t=new Date();vy=t.getFullYear();vm=t.getMonth();sel=key(t);render();});
+$('cmpEx').addEventListener('change',renderCompare);
+$('cmpScope').addEventListener('change',renderCompare);
+$('cmpMetric').addEventListener('change',renderCompare);
+function preview(){
+  var kg=num($('fKg').value), reps=Math.round(num($('fReps').value)), p=$('fPrev');
+  p.textContent=($('fKg').value!==''&&kg>0&&reps>=1)?'この記録の推定1RM: 約 '+fmtKg(e1rm(kg,reps))+' kg（1回だけ上げられる重さの目安）':'重量と回数を入れると、1回だけ上げられる重さの目安（推定1RM）が出ます。';
+}
+$('fKg').addEventListener('input',preview); $('fReps').addEventListener('input',preview); preview();
+$('form').addEventListener('submit',function(ev){
+  ev.preventDefault(); if(readOnly||!myId)return;
+  var ex=$('fEx').value.trim().slice(0,40), kg=num($('fKg').value), reps=Math.round(num($('fReps').value)), sets=Math.round(num($('fSets').value));
+  if(!ex||$('fKg').value===''||kg<0||kg>999||reps<1||sets<1)return;
+  addEntry(sel,ex,kg,reps,sets);
+  $('cmpEx').value=ex; renderCompare();
+  $('fEx').value=''; $('fKg').value=''; preview(); $('fEx').focus();
+});
+/* ---------- 初期設定（アイコンと名前） ---------- */
+var pendingPhoto='';
+function showPrev(){
+  var pv=$('photoPrev'); pv.textContent='';
+  var a=el('span','av'+(pendingPhoto?' photo':' mono'));
+  if(pendingPhoto){var im=document.createElement('img');im.src=pendingPhoto;im.alt='';a.appendChild(im);}
+  else{var n=$('nickIn').value.trim();a.textContent=n?Array.from(n)[0]:'?';}
+  a.setAttribute('aria-hidden','true'); pv.appendChild(a);
+  $('photoClear').hidden=!pendingPhoto;
+}
+function openSetup(first){
+  var m=(myId&&members[myId])||{};
+  endCrop(); pendingPhoto=m.photo||''; $('nickIn').value=m.nick||''; $('goalIn').value=m.goal||'';
+  $('setupTitle').textContent=first?'はじめに、アイコンと名前を決めましょう':'自分のプロフィール';
+  $('setupGo').textContent=first?'はじめる':'保存する';
+  $('setupBack').hidden=!!first;
+  renderTakeover(first); $('homeHint').hidden=!first;
+  showPrev(); document.body.classList.add('setup-open');
+  if(first)$('nickIn').focus();
+}
+function renderTakeover(first){
+  var box=$('takeList'); box.textContent='';
+  var ids=first?Object.keys(members).filter(function(id){return id!==myId&&members[id].nick;}):[];
+  $('takeover').hidden=!ids.length;
+  ids.forEach(function(id){
+    var b=el('button','btn'); b.type='button';
+    b.appendChild(avatar(id)); b.appendChild(el('span',null,members[id].nick+' を引き継ぐ'));
+    b.addEventListener('click',function(){takeOver(id);});
+    box.appendChild(b);
+  });
+}
+function takeOver(old){ // 以前の自分の記録を写し、古い方は一覧から隠す
+  var o=members[old]; if(!o||readOnly||!myId)return;
+  var m=mine();
+  m.nick=o.nick; m.photo=o.photo; m.goal=o.goal; m.d=JSON.parse(JSON.stringify(o.d));
+  m.rep=JSON.parse(JSON.stringify(o.rep||{})); m.rep[old]=Date.now();
+  delete members[old];
+  closeSetup(); render(); saveMine();
+}
+function closeSetup(){document.body.classList.remove('setup-open');if(typeof endCrop==='function'&&$('cropBox'))endCrop();}
+$('openSetup').addEventListener('click',function(){if(!readOnly&&myId)openSetup(false);});
+$('setupBack').addEventListener('click',closeSetup);
+$('nickIn').addEventListener('input',function(){if(!pendingPhoto)showPrev();});
+/* 写真の切り取り: ドラッグで位置、スライダーで拡大 */
+var cropImg=null, cropUrl='', cz=1, cx=0, cy=0;
+function cropSide(){return Math.min(cropImg.naturalWidth,cropImg.naturalHeight)/cz;}
+function drawCrop(){
+  var s=cropSide(), w=cropImg.naturalWidth, h=cropImg.naturalHeight;
+  cx=Math.min(w-s/2,Math.max(s/2,cx)); cy=Math.min(h-s/2,Math.max(s/2,cy));
+  var c=$('cropCv').getContext('2d'); c.fillStyle='#fff'; c.fillRect(0,0,240,240);
+  c.drawImage(cropImg,cx-s/2,cy-s/2,s,s,0,0,240,240);
+}
+function exportCrop(){ // いま丸の中に見えている範囲を 96px のアイコンにする
+  if(!cropImg)return true;
+  try{
+    var s=cropSide(), c=document.createElement('canvas'); c.width=96; c.height=96;
+    var x=c.getContext('2d'); x.fillStyle='#fff'; x.fillRect(0,0,96,96);
+    x.drawImage(cropImg,cx-s/2,cy-s/2,s,s,0,0,96,96);
+    var data=c.toDataURL('image/jpeg',0.82);
+    if(data.indexOf('data:image/jpeg;base64,')!==0||data.length>60000)throw new Error('size');
+    pendingPhoto=data; banner(''); showPrev(); return true;
+  }catch(e){banner('この写真はアイコンにできませんでした。別の写真を選んでください。',true);return false;}
+}
+function endCrop(){
+  cropImg=null; if(cropUrl){URL.revokeObjectURL(cropUrl);cropUrl='';}
+  $('cropBox').hidden=true;
+}
+$('photoIn').addEventListener('change',function(){
+  var f=this.files&&this.files[0]; this.value='';
+  if(!f)return;
+  endCrop();
+  var url=URL.createObjectURL(f), img=new Image();
+  img.onload=function(){
+    if(!img.naturalWidth||!img.naturalHeight){URL.revokeObjectURL(url);return;}
+    cropImg=img; cropUrl=url; cz=1; cx=img.naturalWidth/2; cy=img.naturalHeight/2;
+    $('cropZoom').value='1'; $('cropBox').hidden=false;
+    drawCrop(); if(!exportCrop())endCrop();
+  };
+  img.onerror=function(){URL.revokeObjectURL(url);banner('この写真は読み込めませんでした。JPEGかPNGの写真を選んでください。',true);};
+  img.src=url;
+});
+(function(){
+  var cv=$('cropCv'), drag=false, lx=0, ly=0;
+  cv.addEventListener('pointerdown',function(e){if(!cropImg)return;drag=true;lx=e.clientX;ly=e.clientY;try{cv.setPointerCapture(e.pointerId);}catch(_){}});
+  cv.addEventListener('pointermove',function(e){
+    if(!drag||!cropImg)return;
+    var k=cropSide()/(cv.getBoundingClientRect().width||240);
+    cx-=(e.clientX-lx)*k; cy-=(e.clientY-ly)*k; lx=e.clientX; ly=e.clientY; drawCrop();
+  });
+  function up(){if(drag){drag=false;exportCrop();}}
+  cv.addEventListener('pointerup',up); cv.addEventListener('pointercancel',up);
+  cv.addEventListener('keydown',function(e){
+    if(!cropImg)return; var st=cropSide()*0.05, hit=true;
+    if(e.key==='ArrowLeft')cx-=st; else if(e.key==='ArrowRight')cx+=st; else if(e.key==='ArrowUp')cy-=st; else if(e.key==='ArrowDown')cy+=st; else hit=false;
+    if(hit){e.preventDefault();drawCrop();exportCrop();}
+  });
+  $('cropZoom').addEventListener('input',function(){if(!cropImg)return;cz=Math.min(4,Math.max(1,num(this.value)||1));drawCrop();});
+  $('cropZoom').addEventListener('change',function(){exportCrop();});
+})();
+$('photoClear').addEventListener('click',function(){endCrop();pendingPhoto='';showPrev();});
+$('setupForm').addEventListener('submit',function(ev){
+  ev.preventDefault(); if(readOnly||!myId)return;
+  var n=$('nickIn').value.trim().slice(0,20); if(!n)return;
+  if(!exportCrop())return;
+  var m=mine(); m.nick=n; m.photo=pendingPhoto; m.goal=$('goalIn').value.trim().slice(0,60);
+  closeSetup(); render(); saveMine();
+});
+
+/* ---------- サンプル（データに接続できないとき用） ---------- */
+function loadSample(){
+  sample=true; myId='me';
+  var y=now.getFullYear(), m=now.getMonth(), last=now.getDate();
+  function mk(nick,plan){var d={};plan.forEach(function(p,i){var day=p[0];if(day>last)return;var k=y+'-'+pad(m+1)+'-'+pad(day);if(!d[k])d[k]={};d[k]['s'+i]={ex:p[1],kg:p[2],reps:p[3],sets:3,t:i};});return {nick:nick,d:d};}
+  members={
+    me:mk('',[[1,'ベンチプレス',60,8],[1,'ショルダープレス',30,10],[3,'スクワット',80,8],[6,'ベンチプレス',62.5,6],[9,'デッドリフト',100,5],[12,'スクワット',85,6]]),
+    s1:mk('タクヤ（サンプル）',[[1,'ベンチプレス',70,8],[4,'スクワット',75,10],[6,'ベンチプレス',72.5,5],[10,'デッドリフト',110,5]]),
+    s2:mk('ユウキ（サンプル）',[[2,'ベンチプレス',55,10],[3,'スクワット',90,6],[9,'デッドリフト',95,6],[12,'ラットプルダウン',50,10]])
+  };
+  banner('サンプルを表示中です。データベースの設定がまだ入っていないため、ここでの記録は保存されません。');
+  render();
+}
+
+/* ---------- 起動 ---------- */
+render();
+function newCode(){var a=new Uint8Array(14),c='abcdefghijkmnpqrstuvwxyz23456789',o='';crypto.getRandomValues(a);for(var i=0;i<a.length;i++)o+=c[a[i]%c.length];return o;}
+function readGid(){var m=/[?&]g=([A-Za-z0-9]{8,32})(?:&|$)/.exec(location.search);return m?m[1]:'';}
+function hideReplaced(next){ // 引き継ぎ済みの古い自分は、その後に更新がなければ隠す
+  var gone=[];
+  Object.keys(next).forEach(function(id){
+    var rep=next[id].rep||{};
+    Object.keys(rep).forEach(function(old){if(old!==id&&old!==myId&&next[old]&&(next[old].u||0)<=rep[old])gone.push(old);});
+  });
+  gone.forEach(function(id){delete next[id];});
+}
+function startGroup(){
+  document.body.classList.remove('nogroup'); $('noGroup').hidden=true; $('inviteBtn').hidden=false;
+  members={}; mine(); render();
+  var loaded=false, setupChecked=false;
+  var timer=setTimeout(function(){if(!loaded)banner('データをまだ読み込めていません。通信状況を確認してください。');},10000);
+  onSnapshot(collection(fs,'groups',gid,'members'),function(snap){
+    var next={};
+    snap.docs.forEach(function(d){next[d.id]=clean(d.data());});
+    if(!next[myId])next[myId]=members[myId]||mine();
+    hideReplaced(next);
+    members=next;
+    if(!snap.metadata.fromCache){
+      if(!loaded&&!readOnly)banner('');
+      loaded=true; clearTimeout(timer);
+      if(!setupChecked){ // 初回だけ: 名前が未設定なら初期設定を開く
+        setupChecked=true;
+        if(!readOnly){$('openSetup').hidden=false;if(!members[myId].nick)openSetup(true);}
+      }
+    }
+    render();
+  },function(e){
+    clearTimeout(timer); lock();
+    banner(e&&e.code==='permission-denied'?'このグループを読み込めませんでした。招待リンクが正しいか確認してください。':'データを読み込めませんでした。通信状況を確認して、開き直してください。',true);
+  });
+}
+$('makeGroup').addEventListener('click',function(){
+  if(!myId||gid)return;
+  gid=newCode();
+  try{history.replaceState(null,'',location.pathname+'?g='+gid);}catch(e){}
+  startGroup();
+});
+$('inviteBtn').addEventListener('click',function(){
+  var url=location.origin+location.pathname+'?g='+gid;
+  function shown(){banner('招待リンク: '+url);}
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(url).then(function(){banner('招待リンクをコピーしました。友達に送ってください。');},shown);
+  }else shown();
+});
+(async function(){
+  if(!firebaseConfig||!firebaseConfig.apiKey){loadSample();return;}
+  try{
+    var app=initializeApp(firebaseConfig);
+    fs=getFirestore(app); db=fs;
+    var cred=await signInAnonymously(getAuth(app));
+    myId=cred.user.uid;
+  }catch(e){
+    members={}; render(); lock();
+    banner('サーバーに接続できませんでした。通信状況を確認して、開き直してください。',true);
+    return;
+  }
+  gid=readGid();
+  if(gid){startGroup();}
+  else{members={}; render(); document.body.classList.add('nogroup'); $('noGroup').hidden=false;}
+})();
+if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){
+  navigator.serviceWorker.register('sw.js').catch(function(){});
+}
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // グループの合言葉（招待リンクの g=...）を知っている人だけが、そのグループのメンバーを読める。
+    // グループ一覧は誰も取得できないので、合言葉は推測されない限り漏れない。
+    match /groups/{groupId}/members/{userId} {
+      allow read: if request.auth != null;
+      // 書き込めるのは自分の記録だけ
+      allow create, update: if request.auth != null && request.auth.uid == userId;
+      allow delete: if false;
+    }
+  }
+}
