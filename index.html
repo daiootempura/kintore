@@ -60,6 +60,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15p
 .lvkey{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted)}
 .lvkey span{display:inline-flex;align-items:center;gap:5px}
 .lvkey em{width:10px;height:10px;border-radius:50%;display:inline-block}
+.acts{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .mrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;border-top:1px solid var(--line);padding-top:10px}
 .mrow .who{display:flex;align-items:center;gap:8px;min-width:0;flex:1 1 160px}
 .mrow .who div{display:flex;flex-direction:column;min-width:0}
@@ -307,6 +308,17 @@ input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
       <span><em style="background:#e02b2b"></em>80 kg</span>
     </div>
   </section>
+  <section class="card" id="linkCard" aria-label="招待リンク">
+    <h2>招待リンク</h2>
+    <p class="note">招待リンクを作り直すと、新しいリンクのグループに自分の記録ごと移ります。友達には新しいリンクを送り直してください。前のリンクでは、移った人の記録は見えなくなります。</p>
+    <div class="acts" id="reissueBox"><button class="btn" id="reissueBtn" type="button">招待リンクを作り直す</button></div>
+    <div class="exAdd">
+      <label for="moveIn">新しい招待リンクを受け取った場合は、ここに貼り付けて移動
+        <input id="moveIn" inputmode="url" placeholder="https://…?g=…">
+      </label>
+      <button class="btn" id="moveBtn" type="button">移動</button>
+    </div>
+  </section>
   <section class="card" id="adminCard" hidden aria-label="メンバーの管理">
     <h2>メンバーの管理</h2>
     <div id="adminBody"></div>
@@ -337,7 +349,7 @@ input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
 import firebaseConfig from './config.js';
 import {initializeApp} from './vendor/firebase-app.js';
 import {getAuth,signInAnonymously} from './vendor/firebase-auth.js';
-import {getFirestore,collection,doc,setDoc,deleteDoc,onSnapshot} from './vendor/firebase-firestore.js';
+import {getFirestore,collection,doc,setDoc,getDoc,deleteDoc,onSnapshot} from './vendor/firebase-firestore.js';
 (function(){
 'use strict';
 var BASE_EX=['ベンチプレス','スクワット','デッドリフト','ショルダープレス','ラットプルダウン','懸垂','ベントオーバーロウ','アームカール','レッグプレス','ダンベルプレス'];
@@ -369,6 +381,7 @@ function clean(raw){ // 共有データは信用せず、形を整えてから�
   if(typeof raw.nick==='string')out.nick=raw.nick.slice(0,20);
   if(typeof raw.goal==='string')out.goal=raw.goal.trim().slice(0,60);
   out.u=num(raw.u);
+  if(raw.gone===true)out.gone=true;
   if(Array.isArray(raw.ex))raw.ex.slice(0,60).forEach(function(x){if(typeof x==='string'){x=x.trim().slice(0,40);if(x&&out.ex.indexOf(x)<0)out.ex.push(x);}});
   if(raw.rep&&typeof raw.rep==='object')Object.keys(raw.rep).forEach(function(id){if(/^[A-Za-z0-9]{1,128}$/.test(id))out.rep[id]=num(raw.rep[id]);});
   if(typeof raw.photo==='string'&&raw.photo.length<=60000&&/^data:image\/jpeg;base64,[A-Za-z0-9+\/=]+$/.test(raw.photo))out.photo=raw.photo;
@@ -673,7 +686,7 @@ function lock(){
 var queue=Promise.resolve();
 function saveMine(){
   if(sample||!db||!myId||!gid)return;
-  var body=JSON.parse(JSON.stringify(members[myId])); body.u=Date.now();
+  var body=JSON.parse(JSON.stringify(members[myId])); body.u=Date.now(); delete body.gone;
   queue=queue.then(function(){return setDoc(doc(fs,'groups',gid,'members',myId),body);}).then(function(){
     if(!readOnly)banner('');
   }).catch(function(e){
@@ -951,6 +964,40 @@ function hideReplaced(next){ // 引き継ぎ済みの古い自分は、その後
   });
   gone.forEach(function(id){delete next[id];});
 }
+function load(k){try{return localStorage.getItem(k)||'';}catch(e){return '';}}
+function store(k,v){try{localStorage.setItem(k,v);}catch(e){}}
+function movedMap(){try{var m=JSON.parse(load('mt_moved')||'{}');return (m&&typeof m==='object')?m:{};}catch(e){return {};}}
+var prevGid='';
+function moveFrom(old){ // 前のグループの自分の記録を今のグループへ写し、前のグループからは消す
+  var ref=doc(fs,'groups',old,'members',myId);
+  return getDoc(ref).then(function(snap){
+    if(!snap.exists())return;
+    var c=clean(snap.data()); if(c.gone||!c.nick)return;
+    c.rep={}; members[myId]=c; render(); saveMine();
+    return queue.then(function(){
+      var m=movedMap(); m[old]=gid; store('mt_moved',JSON.stringify(m));
+      return setDoc(ref,{gone:true,nick:'',photo:'',goal:'',u:Date.now(),d:{}});
+    }).then(function(){banner('新しい招待リンクのグループに移り、記録を引き継ぎました。「招待リンクをコピー」で友達に送り直せます。');});
+  });
+}
+function parseGid(text){var m=/(?:[?&]g=|^)([A-Za-z0-9]{8,32})(?:&|$)/.exec((text||'').trim());return m?m[1]:'';}
+function goGroup(g){location.assign(location.pathname+'?g='+g);}
+$('reissueBtn').addEventListener('click',function(){
+  if(readOnly||!myId||!gid)return;
+  var box=$('reissueBox'); box.textContent='';
+  var yes=el('button','btn danger','新しいリンクに作り直す'); yes.type='button';
+  yes.addEventListener('click',function(){goGroup(newCode());});
+  var no=el('button','btn','やめる'); no.type='button';
+  no.addEventListener('click',function(){box.textContent='';box.appendChild($r);});
+  box.appendChild(yes); box.appendChild(no);
+});
+var $r=$('reissueBtn');
+$('moveBtn').addEventListener('click',function(){
+  var g=parseGid($('moveIn').value);
+  if(!g){banner('招待リンクを読み取れませんでした。リンク全体を貼り付けてください。',true);return;}
+  if(g===gid){banner('いま開いているグループと同じリンクです。');return;}
+  goGroup(g);
+});
 function startGroup(){
   document.body.classList.remove('nogroup'); $('noGroup').hidden=true; $('inviteBtn').hidden=false;
   members={}; mine(); render();
@@ -965,7 +1012,8 @@ function startGroup(){
   },function(){groupState='unknown';admins=[];renderAdmin();});
   onSnapshot(collection(fs,'groups',gid,'members'),function(snap){
     var next={};
-    snap.docs.forEach(function(d){next[d.id]=clean(d.data());});
+    var hasMine=false;
+    snap.docs.forEach(function(d){var c=clean(d.data());if(c.gone)return;next[d.id]=c;if(d.id===myId)hasMine=true;}); // 別のリンクへ移った人は表示しない
     allMembers=Object.assign({},next);
     if(!next[myId])next[myId]=members[myId]||mine();
     hideReplaced(next);
@@ -975,7 +1023,13 @@ function startGroup(){
       loaded=true; clearTimeout(timer);
       if(!setupChecked){ // 初回だけ: 名前が未設定なら初期設定を開く
         setupChecked=true;
-        if(!readOnly){$('openSetup').hidden=false;if(!members[myId].nick)openSetup(true);}
+        var fin=function(){
+          store('mt_gid',gid);
+          if(!readOnly){$('openSetup').hidden=false;if(!members[myId].nick)openSetup(true);}
+          render();
+        };
+        // 前に別のリンクのグループにいた端末なら、自分の記録を新しいグループへ移す
+        if(prevGid&&prevGid!==gid&&!hasMine&&!readOnly)moveFrom(prevGid).then(fin,fin); else fin();
       }
     }
     render();
@@ -1010,7 +1064,11 @@ $('inviteBtn').addEventListener('click',function(){
     banner('サーバーに接続できませんでした。通信状況を確認して、開き直してください。',true);
     return;
   }
-  gid=readGid();
+  gid=readGid(); prevGid=load('mt_gid');
+  // ホーム画面のアイコンは古いリンクのまま開くので、移動済みなら新しいグループへ進める
+  var mv=movedMap(), hops=0; while(gid&&mv[gid]&&hops++<10)gid=mv[gid];
+  if(!gid&&prevGid)gid=prevGid;
+  if(gid&&gid!==readGid()){try{history.replaceState(null,'',location.pathname+'?g='+gid);}catch(e){}}
   if(gid){startGroup();}
   else{members={}; render(); document.body.classList.add('nogroup'); $('noGroup').hidden=false;}
 })();
