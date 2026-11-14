@@ -338,7 +338,7 @@ input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
 
   </div>
   </div>
-<p class="note" id="ver" style="text-align:center;flex:none;margin:0 0 4px">版 14</p>
+<p class="note" id="ver" style="text-align:center;flex:none;margin:0 0 4px">版 15</p>
 </div>
 
 <script type="module">
@@ -847,7 +847,6 @@ $('form').addEventListener('submit',function(ev){
       b.x2=Math.cos(t4)*r4; b.y2=Math.sin(t4)*r4; b.rough=.4; b.w*=.65; b.a=.65;
     }
     b.branch=Math.random()<(surge?.75:.4)?{at:rnd(.3,.75),ang:rnd(-1,1),len:rnd(.3,.55)}:null;
-    b.glint=Math.random()<(surge?.8:.35);
     return b;
   }
   function stroke(c,pts,col,core,w,u,al){
@@ -856,11 +855,6 @@ $('form').addEventListener('submit',function(ev){
     c.shadowColor=col; c.shadowBlur=7*u; c.strokeStyle=col; c.globalAlpha=.6*al; c.lineWidth=2.4*w*u; c.stroke();
     c.shadowBlur=3*u; c.strokeStyle=core; c.globalAlpha=al; c.lineWidth=(core===col?1.5:.95)*w*u; c.stroke();
   }
-  function glint(c,x,y,col,core,u,size){ // 稲妻の先で弾ける十字の火花
-    c.shadowColor=col; c.shadowBlur=6*u; c.strokeStyle=core; c.globalAlpha=1; c.lineWidth=.9*u;
-    c.beginPath(); c.moveTo(x-size,y); c.lineTo(x+size,y); c.moveTo(x,y-size); c.lineTo(x,y+size); c.stroke();
-    c.fillStyle=core; c.beginPath(); c.arc(x,y,.9*u,0,Math.PI*2); c.fill();
-  }
   function drawBolt(c,b,col,core,u){
     var pts=jag(b.x1,b.y1,b.x2,b.y2,b.rough,4);
     stroke(c,pts,col,core,b.w,u,b.a);
@@ -868,7 +862,6 @@ $('form').addEventListener('submit',function(ev){
       var p=pts[Math.floor(pts.length*b.branch.at)], dx=b.x2-b.x1, dy=b.y2-b.y1, L=Math.sqrt(dx*dx+dy*dy)*b.branch.len, a=Math.atan2(dy,dx)+b.branch.ang;
       stroke(c,jag(p[0],p[1],p[0]+Math.cos(a)*L,p[1]+Math.sin(a)*L,.5,3),col,core,b.w*.6,u,b.a);
     }
-    if(b.glint)glint(c,b.x2,b.y2,col,core,u,rnd(2.2,4.6)*u);
   }
   function frame(now){
     var list=document.querySelectorAll('.aw canvas'), vw=window.innerWidth, vh=window.innerHeight, dk=isDark(now);
@@ -892,7 +885,6 @@ $('form').addEventListener('submit',function(ev){
       var core=dk?'#ffffff':col;   // 白い画面では白い芯が見えないので、色そのもので描く
       c.translate(size/2,size/2); c.lineCap='round'; c.lineJoin='round';
       for(var b=0;b<st.bolts.length;b++)drawBolt(c,st.bolts[b],col,core,u);
-      if(surge){for(var g=0;g<2;g++){var t=rnd(0,Math.PI*2),rr=R*rnd(.7,1.25);glint(c,Math.cos(t)*rr,Math.sin(t)*rr,col,core,u,rnd(1.6,3.4)*u);}}
       c.globalAlpha=1; c.shadowBlur=0;
     }
   }
