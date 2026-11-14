@@ -48,15 +48,10 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15p
 .aw.lv2{--aura:#1f7ae0}
 .aw.lv3{--aura:#e02b2b}
 .aw .av{border-color:var(--aura);box-shadow:0 0 0 1px var(--aura),0 0 7px 1px var(--aura);animation:auraPulse 1.6s ease-in-out infinite}
-.aw i{position:absolute;width:9px;height:14px;background:var(--aura);clip-path:polygon(58% 0,12% 56%,44% 56%,28% 100%,88% 38%,56% 38%,78% 0);filter:drop-shadow(0 0 2px var(--aura));animation:zap 1.6s steps(1,end) infinite;pointer-events:none}
-.aw i:nth-of-type(1){top:-7px;right:-6px;transform:rotate(18deg)}
-.aw i:nth-of-type(2){bottom:-7px;left:-6px;transform:rotate(198deg);animation-delay:.55s}
-.aw i:nth-of-type(3){top:-6px;left:-5px;transform:rotate(-30deg) scale(.8);animation-delay:1.05s}
-.aw.sm i{display:none}
+.aw canvas{position:absolute;left:50%;top:50%;width:56px;height:56px;transform:translate(-50%,-50%);pointer-events:none}
 .aw.sm .av{box-shadow:0 0 0 1.5px var(--aura);animation:none}
-@keyframes zap{0%{opacity:0}6%{opacity:1}12%{opacity:.15}18%{opacity:1}26%{opacity:.4}32%{opacity:0}100%{opacity:0}}
 @keyframes auraPulse{0%,100%{box-shadow:0 0 0 1px var(--aura),0 0 5px 0 var(--aura)}50%{box-shadow:0 0 0 1px var(--aura),0 0 10px 2px var(--aura)}}
-@media (prefers-reduced-motion: reduce){.aw i{animation:none;opacity:1}.aw .av{animation:none}}
+@media (prefers-reduced-motion: reduce){.aw .av{animation:none}}
 .lvkey{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted)}
 .lvkey span{display:inline-flex;align-items:center;gap:5px}
 .lvkey em{width:10px;height:10px;border-radius:50%;display:inline-block}
@@ -414,7 +409,7 @@ function avatar(uid,small){ // 選んだ写真。未設定なら名前の頭文�
   a.setAttribute('aria-hidden','true');
   var lv=benchLevel(uid); if(!lv)return a;
   var w=el('span','aw lv'+lv+(small?' sm':'')); w.setAttribute('aria-hidden','true');
-  w.appendChild(a); for(var k=0;k<3;k++)w.appendChild(document.createElement('i'));
+  w.appendChild(a); if(!small){var cv=document.createElement('canvas');cv.width=cv.height=112;w.appendChild(cv);}
   return w;
 }
 function benchLevel(uid){ // ベンチプレスで実際に記録した最高重量: 60kg→1(緑) 70kg→2(青) 80kg→3(赤)
@@ -814,6 +809,58 @@ $('form').addEventListener('submit',function(ev){
   blocks=[{ex:blocks[blocks.length-1].ex,rows:[{kg:'',reps:'10'}]}];
   render(); renderBlocks(); preview(); $('cmpEx').value=firstEx; renderCompare(); saveMine();
 });
+
+/* ---------- 稲妻: アイコンの縁を走る放電を、毎回形を変えて描く ---------- */
+(function(){
+  var still=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function isDark(){return getComputedStyle(document.documentElement).getPropertyValue('--bg').trim().toLowerCase()!=='#ffffff';}
+  function bolt(c,cx,cy,r,col){
+    var a=Math.random()*Math.PI*2, span=0.7+Math.random()*1.3, n=9, pts=[], k;
+    for(k=0;k<=n;k++){
+      var t=k/n, ang=a+span*t, env=Math.sin(Math.PI*t);            // 両端は縁に付き、中ほどで外へ跳ねる
+      var rr=r+1+env*(2+Math.random()*9)+(Math.random()-0.5)*3;
+      pts.push([cx+Math.cos(ang)*rr, cy+Math.sin(ang)*rr]);
+    }
+    function path(list){c.beginPath();c.moveTo(list[0][0],list[0][1]);for(var i=1;i<list.length;i++)c.lineTo(list[i][0],list[i][1]);}
+    var branches=[];
+    for(k=2;k<n-1;k++){ if(Math.random()<0.28){ // 枝分かれ
+      var p=pts[k], ang2=Math.atan2(p[1]-cy,p[0]-cx)+(Math.random()-0.5)*1.2, len=5+Math.random()*9;
+      var mid=[p[0]+Math.cos(ang2)*len*0.5+(Math.random()-0.5)*4, p[1]+Math.sin(ang2)*len*0.5+(Math.random()-0.5)*4];
+      branches.push([p,mid,[p[0]+Math.cos(ang2)*len,p[1]+Math.sin(ang2)*len]]);
+    }}
+    c.lineJoin='miter'; c.lineCap='round';
+    c.shadowColor=col; c.shadowBlur=10; c.strokeStyle=col;
+    c.lineWidth=3; path(pts); c.stroke();
+    c.lineWidth=1.6; branches.forEach(function(b){path(b);c.stroke();});
+    if(isDark()){ // 暗い背景では白く光る芯を重ねる。明るい背景では色の線だけの方がはっきり見える
+      c.shadowBlur=0; c.strokeStyle='rgba(255,255,255,.95)';
+      c.lineWidth=1.1; path(pts); c.stroke();
+      c.lineWidth=0.7; branches.forEach(function(b){path(b);c.stroke();});
+    }
+  }
+  function frame(){
+    var list=document.querySelectorAll('.aw canvas');
+    for(var i=0;i<list.length;i++){
+      var cv=list[i]; if(!cv.offsetParent)continue;
+      var c=cv.getContext('2d'); c.clearRect(0,0,112,112);
+      if(!still&&Math.random()<0.22)continue;                        // ときどき消えて、ちらつかせる
+      var col=getComputedStyle(cv.parentNode).getPropertyValue('--aura').trim()||'#1faa4b';
+      var n=still?2:(1+(Math.random()<0.6?1:0)+(Math.random()<0.25?1:0));
+      for(var k=0;k<n;k++)bolt(c,56,56,27,col);
+    }
+  }
+  var last=0;
+  function loop(t){ if(t-last>(still?100000:75)){last=t;frame();} requestAnimationFrame(loop); }
+  if(still){ // 動きを減らす設定の人には、描き直さず静止した稲妻を見せる
+    var seen=new WeakSet();
+    setInterval(function(){
+      var l=document.querySelectorAll('.aw canvas');
+      for(var i=0;i<l.length;i++){ if(seen.has(l[i])||!l[i].offsetParent)continue; seen.add(l[i]);
+        var c=l[i].getContext('2d'), col=getComputedStyle(l[i].parentNode).getPropertyValue('--aura').trim()||'#1faa4b';
+        bolt(c,56,56,27,col); bolt(c,56,56,27,col); }
+    },400);
+  }else requestAnimationFrame(loop);
+})();
 
 /* ---------- ページ切り替え（タブと左右スワイプ） ---------- */
 (function(){
