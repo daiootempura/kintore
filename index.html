@@ -61,6 +61,18 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15p
 #ach[hidden]{display:none}
 #prof{position:fixed;inset:0;z-index:15;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.55)}
 #prof[hidden]{display:none}
+#pick{position:fixed;inset:0;z-index:16;display:flex;align-items:flex-start;justify-content:center;padding:16px;background:rgba(0,0,0,.55)}
+#pick[hidden]{display:none}
+#pick>.card{max-width:440px;width:100%;max-height:100%;gap:10px}
+#pickList{display:flex;flex-direction:column;gap:2px;overflow-y:auto;min-height:0;flex:1 1 auto}
+#pickList h3{font-size:12px;color:var(--muted);margin:8px 0 2px;font-weight:500}
+.pitem{text-align:left;border:none;background:none;border-radius:8px;padding:9px 10px;min-height:40px;overflow-wrap:anywhere}
+.pitem:hover{background:var(--line)}
+.pitem.on{font-weight:700;box-shadow:inset 0 0 0 1.5px var(--ink)}
+#pick .acts{justify-content:flex-end;flex:none}
+.exPick{flex:1 1 auto;min-width:0;display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left}
+.exPick span{font-weight:700;overflow-wrap:anywhere}
+.exPick small{font-size:11px;color:var(--muted);flex:none}
 #prof>.card{max-width:440px;width:100%;max-height:100%;overflow-y:auto;gap:14px}
 #profBody{display:flex;flex-direction:column;gap:14px}
 #prof .acts{justify-content:flex-end}
@@ -414,6 +426,15 @@ input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
     <div class="acts"><button class="btn" id="profEdit" type="button" hidden>プロフィールを編集</button><button class="btn" id="profClose" type="button">閉じる</button></div>
   </div>
 </div>
+<div id="pick" hidden role="dialog" aria-modal="true" aria-label="種目を選ぶ">
+  <div class="card">
+    <label for="pickQ">種目を検索
+      <input id="pickQ" type="search" autocomplete="off" placeholder="例: べんち、ラン">
+    </label>
+    <div id="pickList"></div>
+    <div class="acts"><button class="btn" id="pickClose" type="button">閉じる</button></div>
+  </div>
+</div>
 <div id="ach" hidden role="dialog" aria-modal="true" aria-labelledby="achTitle">
   <div class="card">
     <div id="achPrev"></div>
@@ -425,7 +446,7 @@ input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
     </div>
   </div>
 </div>
-<p class="note" id="ver" style="text-align:center;flex:none;margin:0 0 4px">版 26</p>
+<p class="note" id="ver" style="text-align:center;flex:none;margin:0 0 4px">版 27</p>
 </div>
 
 <script type="module">
@@ -506,7 +527,7 @@ function avatar(uid,small,force){ // 選んだ写真。未設定なら名前の�
   if(!lv||(!aura&&!crown))return a;
   var w=el('span','aw '+(aura?'lv'+lv:'noaura')+(small?' sm':'')); w.setAttribute('aria-hidden','true');
   w.appendChild(a);
-  if(aura&&!small){var cv=document.createElement('canvas');cv.dataset.lv=lv;w.appendChild(cv);}
+  if(aura){var cv=document.createElement('canvas');cv.dataset.lv=lv;if(small)cv.dataset.sm='1';w.appendChild(cv);}
   if(crown){ // 100kg: 王冠
     var cr=el('span','crown');
     cr.innerHTML='<svg viewBox="0 0 24 18"><path d="M2 15 L1 4 L7.5 9 L12 1.5 L16.5 9 L23 4 L22 15 Z" fill="#f5c518" stroke="#7a5600" stroke-width="1.3" stroke-linejoin="round"/><rect x="2" y="14.2" width="20" height="2.8" rx="1" fill="#e0a800" stroke="#7a5600" stroke-width="1.1"/><circle cx="12" cy="10.5" r="1.6" fill="#d7263d"/><circle cx="1" cy="4" r="1.4" fill="#f5c518" stroke="#7a5600" stroke-width=".8"/><circle cx="12" cy="1.5" r="1.4" fill="#f5c518" stroke="#7a5600" stroke-width=".8"/><circle cx="23" cy="4" r="1.4" fill="#f5c518" stroke="#7a5600" stroke-width=".8"/></svg>';
@@ -580,7 +601,7 @@ function bestsOf(uid){ // 種目ごとの最高重量・その日付・推定1RM
     if(e.kg>o.kg||(e.kg===o.kg&&e.reps>o.reps)){o.kg=e.kg;o.reps=e.reps;o.date=date;}
     var r=e1rm(e.kg,e.reps); if(r>o.rm)o.rm=r;
   });});
-  return Object.keys(out).map(function(k){return out[k];}).sort(function(a,b){return b.n-a.n||a.ex.localeCompare(b.ex,'ja');});
+  return Object.keys(out).map(function(k){return out[k];}).sort(function(a,b){return a.ex.localeCompare(b.ex,'ja');});
 }
 function openProfile(uid){
   var m=members[uid]; if(!m)return;
@@ -738,27 +759,75 @@ function renderDay(){
   });
   renderExercises();
 }
-function exOptions(){ // 自分で追加した種目 → 基本の種目 → みんなが記録した種目
+function exOptions(){ // 自分で追加した種目・基本の種目・みんなが記録した種目を、名前の順に
   var seen={}, out=[];
   myEx().concat(BASE_EX,BASE_CARDIO,allExercises(true)).forEach(function(x){if(!seen[x]){seen[x]=1;out.push(x);}});
-  return out;
+  return out.sort(function(a,b){return a.localeCompare(b,'ja');});
 }
-function fillSelect(s,cur){ // 筋トレと有酸素に分けて並べる
-  var opts=exOptions(); s.textContent='';
+function validEx(cur){ // 選択肢にない種目名なら、既定の種目に戻す
+  var opts=exOptions();
+  if(cur&&opts.indexOf(cur)>=0)return cur;
+  return opts.indexOf('ベンチプレス')>=0?'ベンチプレス':(opts[0]||'');
+}
+/* ---------- 種目を探して選ぶ画面 ---------- */
+var pickFor=null;
+function kana(t){ // ひらがなでもカタカナでも探せるようにそろえる
+  return (t||'').toLowerCase().replace(/[\u3041-\u3096]/g,function(c){return String.fromCharCode(c.charCodeAt(0)+0x60);}).replace(/\s+/g,'');
+}
+function openPicker(b,bi){
+  if(readOnly)return;
+  pickFor={b:b,bi:bi}; $('pickQ').value=''; renderPick(); $('pick').hidden=false; $('pickQ').focus();
+}
+function closePicker(){ var bi=pickFor?pickFor.bi:0; $('pick').hidden=true; pickFor=null; var f=$('ex'+bi); if(f)f.focus(); }
+function choosePick(x){
+  var p=pickFor; if(!p)return;
+  p.b.ex=x; $('pick').hidden=true; pickFor=null; renderBlocks('ex'+p.bi); preview();
+}
+function addName(x,cardio){ // 新しい種目名を自分の一覧に加える
+  var m=mine(); x=(x||'').trim().slice(0,40); if(!x)return '';
+  if(m.ex.indexOf(x)<0){
+    if(m.ex.length>=60){banner('自分の種目は60個までです。使わない種目を削除してから追加してください。',true);return '';}
+    m.ex.push(x);
+  }
+  if(cardio&&m.cex.indexOf(x)<0)m.cex.push(x);
+  return x;
+}
+function renderPick(){
+  var raw=$('pickQ').value.trim(), q=kana(raw), box=$('pickList'), n=0, exact=false; box.textContent='';
   [['筋トレ',false],['有酸素',true]].forEach(function(g){
-    var og=document.createElement('optgroup'); og.label=g[0];
-    opts.forEach(function(x){if(isCardio(x)!==g[1])return;var o=document.createElement('option');o.value=x;o.textContent=x;og.appendChild(o);});
-    if(og.childNodes.length)s.appendChild(og);
+    var items=exOptions().filter(function(x){return isCardio(x)===g[1]&&(!q||kana(x).indexOf(q)>=0);});
+    if(!items.length)return;
+    box.appendChild(el('h3',null,g[0]));
+    items.forEach(function(x){
+      if(kana(x)===q)exact=true;
+      var bt=el('button','pitem'+(pickFor&&pickFor.b.ex===x?' on':''),x); bt.type='button';
+      bt.addEventListener('click',function(){choosePick(x);});
+      box.appendChild(bt); n++;
+    });
   });
-  if(cur&&opts.indexOf(cur)>=0)s.value=cur;
-  return s.value;
+  if(!n)box.appendChild(el('p','note','「'+raw+'」に合う種目はありません'));
+  if(raw&&!exact&&myId&&!readOnly){ // 見つからない名前は、その場で追加できる
+    box.appendChild(el('h3',null,'新しく追加'));
+    [['「'+raw+'」を筋トレの種目として追加',false],['「'+raw+'」を有酸素の種目として追加',true]].forEach(function(o){
+      var bt=el('button','pitem',o[0]); bt.type='button';
+      bt.addEventListener('click',function(){var x=addName(raw,o[1]);if(!x)return;render();choosePick(x);saveMine();});
+      box.appendChild(bt);
+    });
+  }
 }
+$('pickQ').addEventListener('input',renderPick);
+$('pickQ').addEventListener('keydown',function(e){
+  if(e.key==='Enter'){e.preventDefault();var f=$('pickList').querySelector('.pitem');if(f)f.click();}
+});
+$('pickClose').addEventListener('click',closePicker);
+$('pick').addEventListener('click',function(e){if(e.target===this)closePicker();});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!$('pick').hidden)closePicker();});
 function myEx(){return (myId&&members[myId]&&members[myId].ex)||[];}
 function renderExercises(){ // 種目の選択肢: 自分で追加した種目 → 基本の種目 → みんなが記録した種目
-  (typeof blocks==='undefined'?[]:blocks||[]).forEach(function(b,i){var s=$('ex'+i);if(s)b.ex=fillSelect(s,b.ex);});
+  (typeof blocks==='undefined'?[]:blocks||[]).forEach(function(b,i){var s=$('ex'+i);if(s){b.ex=validEx(b.ex);s.firstChild.textContent=b.ex;}});
   var box=$('exMine'); box.textContent='';
   if(!myEx().length)box.appendChild(el('span','note','自分で追加した種目はまだありません。'));
-  myEx().forEach(function(x){
+  myEx().slice().sort(function(a,b){return a.localeCompare(b,'ja');}).forEach(function(x){
     var c=el('span','chip'); c.appendChild(el('span',null,x+(isCardio(x)?'（有酸素）':'')));
     if(!readOnly){
       var b=el('button',null,'削除'); b.type='button'; b.setAttribute('aria-label',x+' を自分の種目から削除');
@@ -770,13 +839,8 @@ function renderExercises(){ // 種目の選択肢: 自分で追加した種目 �
 }
 function addExercise(){
   if(readOnly||!myId)return;
-  var x=$('newEx').value.trim().slice(0,40); if(!x){$('newEx').focus();return;}
-  var m=mine();
-  if(m.ex.indexOf(x)<0){
-    if(m.ex.length>=60){banner('自分の種目は60個までです。使わない種目を削除してから追加してください。',true);return;}
-    m.ex.push(x);
-  }
-  if($('newExCardio').checked&&m.cex.indexOf(x)<0)m.cex.push(x);
+  if(!$('newEx').value.trim()){$('newEx').focus();return;}
+  var x=addName($('newEx').value,$('newExCardio').checked); if(!x)return;
   $('newEx').value=''; $('newExCardio').checked=false; render(); blocks[blocks.length-1].ex=x; renderBlocks(); saveMine();
 }
 var openCharts={};
@@ -790,7 +854,7 @@ function renderCompare(){ // 種目の一覧だけを出し、「グラフ」を
     if(rows.length)charts.push({ex:ex,rows:rows.sort(function(a,b){return b.b-a.b;})});
   });
   if(!charts.length){box.appendChild(el('p','note',prefix?'この月の記録はまだありません':'記録はまだありません'));return;}
-  charts.sort(function(a,b){return b.rows.length-a.rows.length||a.ex.localeCompare(b.ex,'ja');});
+  charts.sort(function(a,b){return a.ex.localeCompare(b.ex,'ja');});   // 名前の順
   charts.forEach(function(ch,ci){
     var blk=el('div','chart'), head=el('div','chead'), open=!!openCharts[ch.ex];
     head.appendChild(el('h3',null,ch.ex));
@@ -982,9 +1046,11 @@ function renderBlocks(focusId){
   var box=$('blocks'); box.textContent='';
   blocks.forEach(function(b,bi){
     var blk=el('div','block'), head=el('div','bhead');
-    var s=document.createElement('select'); s.id='ex'+bi; s.setAttribute('aria-label',(bi+1)+'つ目の種目'); s.disabled=readOnly;
-    b.ex=fillSelect(s,b.ex);
-    s.addEventListener('change',function(){b.ex=s.value;renderBlocks('ex'+bi);preview();});  // 筋トレ／有酸素で入力欄が変わる
+    b.ex=validEx(b.ex);
+    var s=el('button','btn exPick'); s.type='button'; s.id='ex'+bi; s.disabled=readOnly;
+    s.appendChild(el('span',null,b.ex)); s.appendChild(el('small',null,'検索・変更'));
+    s.setAttribute('aria-label',(bi+1)+'つ目の種目: '+b.ex+'。押すと種目を検索して変更');
+    s.addEventListener('click',function(){openPicker(b,bi);});
     head.appendChild(s);
     if(blocks.length>1){
       var xb=el('button','x','外す'); xb.type='button'; xb.disabled=readOnly; xb.setAttribute('aria-label',(bi+1)+'つ目の種目を入力から外す');
@@ -1109,11 +1175,12 @@ $('form').addEventListener('submit',function(ev){
     b.branch=Math.random()<(surge?.75:.4)?{at:rnd(.3,.75),ang:rnd(-1,1),len:rnd(.3,.55)}:null;
     return b;
   }
+  var glow=true;   // 小さいアイコンでは、ぼかしを省いて軽く描く
   function stroke(c,pts,col,core,w,u,al){
     al=al||1;
     c.beginPath(); c.moveTo(pts[0][0],pts[0][1]); for(var i=1;i<pts.length;i++)c.lineTo(pts[i][0],pts[i][1]);
-    c.shadowColor=col; c.shadowBlur=7*u; c.strokeStyle=col; c.globalAlpha=.6*al; c.lineWidth=2.4*w*u; c.stroke();
-    c.shadowBlur=3*u; c.strokeStyle=core; c.globalAlpha=al; c.lineWidth=(core===col?1.5:.95)*w*u; c.stroke();
+    c.shadowColor=col; c.shadowBlur=glow?7*u:0; c.strokeStyle=col; c.globalAlpha=.6*al; c.lineWidth=2.4*w*u; c.stroke();
+    c.shadowBlur=glow?3*u:0; c.strokeStyle=core; c.globalAlpha=al; c.lineWidth=(core===col?1.5:.95)*w*u; c.stroke();
   }
   function drawBolt(c,b,col,core,u){
     var pts=jag(b.x1,b.y1,b.x2,b.y2,b.rough,4);
@@ -1123,27 +1190,31 @@ $('form').addEventListener('submit',function(ev){
       stroke(c,jag(p[0],p[1],p[0]+Math.cos(a)*L,p[1]+Math.sin(a)*L,.5,3),col,core,b.w*.6,u,b.a);
     }
   }
+  var tick=0;
   function frame(now){
+    tick++;
     var list=document.querySelectorAll('.aw canvas'), vw=window.innerWidth, vh=window.innerHeight, dk=isDark(now);
     for(var i=0;i<list.length;i++){
-      var cv=list[i], wrap=cv.parentNode, box=wrap.getBoundingClientRect();
+      var cv=list[i], sm=!!cv.dataset.sm;
+      if(sm&&(tick+i)%2)continue;                                                   // カレンダーの小さいものは1回おきに描き直す
+      var wrap=cv.parentNode, box=wrap.getBoundingClientRect();
       if(!box.width||box.right<0||box.left>vw||box.bottom<0||box.top>vh)continue;   // 画面外は描かない
       var dpr=Math.min(window.devicePixelRatio||1,3), size=Math.round(box.width*3.2*dpr);
       if(cv.width!==size){cv.width=size;cv.height=size;}
       var st=state.get(cv); if(!st){st={bolts:[],next:now+rnd(600,2600),end:0};state.set(cv,st);}
-      var lv=Math.min(+cv.dataset.lv||1,4), u=dpr, R=box.width/2*dpr;
+      var lv=Math.min(+cv.dataset.lv||1,4), u=sm?dpr*.6:dpr, R=box.width/2*dpr;
       // ときどき激しくなる（レベルが高いほど頻繁に、長く）
       if(now>st.next){st.end=now+rnd(1100,1600)+lv*200;st.next=st.end+rnd(3600,6500)-lv*450;}
       var surge=now<st.end;
       if(surge!==st.was){st.was=surge;wrap.classList.toggle('surge',surge);}
       for(var k=st.bolts.length-1;k>=0;k--){if(--st.bolts[k].life<=0)st.bolts.splice(k,1);}
-      var want=surge?3+lv+Math.floor(Math.random()*2):1+(Math.random()<.45?1:0);
+      var want=sm?(surge?2:1):(surge?3+lv+Math.floor(Math.random()*2):1+(Math.random()<.45?1:0));
       while(st.bolts.length<want)st.bolts.push(newBolt(R,surge,lv));
       var c=cv.getContext('2d'); c.setTransform(1,0,0,1,0,0); c.clearRect(0,0,size,size);
       if(!surge&&Math.random()<.1)continue;                                        // 一瞬消えて、ちらつく
       var col=getComputedStyle(wrap).getPropertyValue('--aura').trim()||'#1faa4b';
       var core=dk?'#ffffff':col;   // 白い画面では白い芯が見えないので、色そのもので描く
-      c.translate(size/2,size/2); c.lineCap='round'; c.lineJoin='round';
+      c.translate(size/2,size/2); c.lineCap='round'; c.lineJoin='round'; glow=!sm;
       for(var b=0;b<st.bolts.length;b++)drawBolt(c,st.bolts[b],col,core,u);
       c.globalAlpha=1; c.shadowBlur=0;
     }
