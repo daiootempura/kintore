@@ -832,7 +832,7 @@ $('form').addEventListener('submit',function(ev){
     return pts;
   }
   function newBolt(R,surge,lv){
-    var t=rnd(0,Math.PI*2), kind=Math.random(), k=surge?1:0, b={life:surge?rnd(2,5):rnd(1,3),w:rnd(.7,1.15)+(surge?.25:0)};
+    var t=rnd(0,Math.PI*2), kind=Math.random(), k=surge?1:0, b={life:surge?rnd(2,5):rnd(2,4),w:rnd(.7,1.15)+(surge?.25:0)};
     b.x1=Math.cos(t)*R; b.y1=Math.sin(t)*R;
     if(kind<.5){            // 外へ飛ぶ
       var r2=R*rnd(1.35,1.75+.55*k+.1*lv), t2=t+rnd(-.5,.5);
@@ -877,14 +877,14 @@ $('form').addEventListener('submit',function(ev){
       var st=state.get(cv); if(!st){st={bolts:[],next:now+rnd(600,2600),end:0};state.set(cv,st);}
       var lv=+cv.dataset.lv||1, u=dpr, R=box.width/2*dpr;
       // ときどき激しくなる（レベルが高いほど頻繁に、長く）
-      if(now>st.next){st.end=now+rnd(350,650)+lv*120;st.next=st.end+rnd(2600,5200)-lv*450;}
+      if(now>st.next){st.end=now+rnd(700,1100)+lv*150;st.next=st.end+rnd(3200,6000)-lv*450;}
       var surge=now<st.end;
       if(surge!==st.was){st.was=surge;wrap.classList.toggle('surge',surge);}
       for(var k=st.bolts.length-1;k>=0;k--){if(--st.bolts[k].life<=0)st.bolts.splice(k,1);}
       var want=surge?3+lv+Math.floor(Math.random()*2):(Math.random()<.7?1+(Math.random()<.3?1:0):0);
       while(st.bolts.length<want)st.bolts.push(newBolt(R,surge,lv));
       var c=cv.getContext('2d'); c.setTransform(1,0,0,1,0,0); c.clearRect(0,0,size,size);
-      if(!surge&&Math.random()<.18)continue;                                        // 一瞬消えて、ちらつく
+      if(!surge&&Math.random()<.1)continue;                                        // 一瞬消えて、ちらつく
       var col=getComputedStyle(wrap).getPropertyValue('--aura').trim()||'#1faa4b';
       var core=dk?'#ffffff':col;   // 白い画面では白い芯が見えないので、色そのもので描く
       c.translate(size/2,size/2); c.lineCap='round'; c.lineJoin='round';
@@ -907,7 +907,7 @@ $('form').addEventListener('submit',function(ev){
     },500);
   }else{
     var last=0;
-    (function loop(t){ if(t-last>55){last=t;frame(t);} requestAnimationFrame(loop); })(0);
+    (function loop(t){ if(t-last>120){last=t;frame(t);} requestAnimationFrame(loop); })(0);
   }
 })();
 
