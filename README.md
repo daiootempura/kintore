@@ -1,4 +1,4 @@
-# 筋トレ共有カレンダー
+# MuscleTempura
 
 友達と筋トレの記録を共有するウェブアプリです。GitHub Pages で公開し、データは Firebase（Firestore・匿名ログイン）に保存します。
 

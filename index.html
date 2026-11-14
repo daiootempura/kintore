@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>筋トレ共有カレンダー</title>
+<title>MuscleTempura</title>
 <meta name="theme-color" content="#111111">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="筋トレ共有">
+<meta name="apple-mobile-web-app-title" content="MuscleTempura">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
@@ -93,6 +93,14 @@ button{font:inherit;color:inherit;cursor:pointer}
 #cropBox label{width:240px;max-width:100%}
 input[type="range"]{padding:0;border:none;background:none;min-height:28px;accent-color:var(--ink)}
 .gline{font-size:12px;color:var(--muted);padding-left:32px;overflow-wrap:anywhere}
+.exTools{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+#exPanel{display:flex;flex-direction:column;gap:8px;width:100%;border:1px solid var(--line);border-radius:8px;padding:10px}
+#exPanel[hidden]{display:none}
+.exAdd{display:flex;gap:8px;align-items:flex-end}
+.exAdd label{flex:1 1 auto;min-width:0}
+.exMine{display:flex;flex-wrap:wrap;gap:6px}
+.exMine .chip button{border:none;background:none;color:var(--muted);padding:0 2px;min-height:24px}
+.exMine .chip button:hover{color:var(--warn)}
 .tap{cursor:pointer;border-radius:6px}
 .tap:hover{opacity:.7}
 .card[hidden]{display:none}
@@ -149,7 +157,7 @@ input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
 <div class="wrap">
   <header>
     <div>
-      <h1>筋トレ共有カレンダー</h1>
+      <h1>MuscleTempura</h1>
       <p class="note">日付を選んで種目と重量を記録すると、友達の記録と並べて差を確認できます。</p>
     </div>
     <div class="legend" id="legend" aria-label="メンバーと今月のトレーニング日数"></div>
@@ -221,9 +229,20 @@ input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
       <div id="dayList"></div>
       <form id="form" autocomplete="off">
         <label class="full" for="fEx">種目
-          <input id="fEx" list="exList" required maxlength="40" placeholder="例: ベンチプレス">
+          <select id="fEx" required></select>
         </label>
-        <datalist id="exList"></datalist>
+        <div class="full exTools">
+          <button class="btn" id="exToggle" type="button" aria-expanded="false" aria-controls="exPanel">種目を追加・整理</button>
+          <div id="exPanel" hidden>
+            <div class="exAdd">
+              <label for="newEx">新しい種目の名前
+                <input id="newEx" maxlength="40" placeholder="例: インクラインベンチ">
+              </label>
+              <button class="btn" id="newExBtn" type="button">追加</button>
+            </div>
+            <div class="exMine" id="exMine"></div>
+          </div>
+        </div>
         <label for="fKg">重量 (kg)
           <input id="fKg" type="number" inputmode="decimal" min="0" max="999" step="0.5" required>
         </label>
@@ -288,11 +307,12 @@ function e1rm(kg,reps){reps=Math.max(1,reps);return reps<=1?kg:kg*(1+reps/30);}
 function repsFor(goal,kg){if(kg<=0)return null;if(kg>=goal)return 1;return Math.ceil(30*(goal/kg-1)-1e-9);}
 
 function clean(raw){ // 共有データは信用せず、形を整えてから使う
-  var out={nick:'',photo:'',goal:'',u:0,rep:{},d:{}};
+  var out={nick:'',photo:'',goal:'',u:0,rep:{},ex:[],d:{}};
   if(!raw||typeof raw!=='object')return out;
   if(typeof raw.nick==='string')out.nick=raw.nick.slice(0,20);
   if(typeof raw.goal==='string')out.goal=raw.goal.trim().slice(0,60);
   out.u=num(raw.u);
+  if(Array.isArray(raw.ex))raw.ex.slice(0,60).forEach(function(x){if(typeof x==='string'){x=x.trim().slice(0,40);if(x&&out.ex.indexOf(x)<0)out.ex.push(x);}});
   if(raw.rep&&typeof raw.rep==='object')Object.keys(raw.rep).forEach(function(id){if(/^[A-Za-z0-9]{1,128}$/.test(id))out.rep[id]=num(raw.rep[id]);});
   if(typeof raw.photo==='string'&&raw.photo.length<=60000&&/^data:image\/jpeg;base64,[A-Za-z0-9+\/=]+$/.test(raw.photo))out.photo=raw.photo;
   var d=raw.d;
@@ -427,9 +447,38 @@ function renderDay(){
     });
     list.appendChild(box);
   });
-  var dl=$('exList'); dl.textContent='';
-  var seen={};
-  allExercises().concat(BASE_EX).forEach(function(x){if(seen[x])return;seen[x]=1;var o=document.createElement('option');o.value=x;dl.appendChild(o);});
+  renderExercises();
+}
+function myEx(){return (myId&&members[myId]&&members[myId].ex)||[];}
+function renderExercises(){ // 種目の選択肢: 自分で追加した種目 → 基本の種目 → みんなが記録した種目
+  var s=$('fEx'), cur=s.value, seen={};
+  s.textContent='';
+  myEx().concat(BASE_EX,allExercises()).forEach(function(x){
+    if(seen[x])return; seen[x]=1;
+    var o=document.createElement('option'); o.value=x; o.textContent=x; s.appendChild(o);
+  });
+  if(seen[cur])s.value=cur;
+  var box=$('exMine'); box.textContent='';
+  if(!myEx().length)box.appendChild(el('span','note','自分で追加した種目はまだありません。'));
+  myEx().forEach(function(x){
+    var c=el('span','chip'); c.appendChild(el('span',null,x));
+    if(!readOnly){
+      var b=el('button',null,'削除'); b.type='button'; b.setAttribute('aria-label',x+' を自分の種目から削除');
+      b.addEventListener('click',function(){var m=mine();m.ex=m.ex.filter(function(y){return y!==x;});render();saveMine();});
+      c.appendChild(b);
+    }
+    box.appendChild(c);
+  });
+}
+function addExercise(){
+  if(readOnly||!myId)return;
+  var x=$('newEx').value.trim().slice(0,40); if(!x){$('newEx').focus();return;}
+  var m=mine();
+  if(m.ex.indexOf(x)<0){
+    if(m.ex.length>=60){banner('自分の種目は60個までです。使わない種目を削除してから追加してください。',true);return;}
+    m.ex.push(x);
+  }
+  $('newEx').value=''; render(); $('fEx').value=x; saveMine();
 }
 function renderCompare(){
   var s=$('cmpEx'), cur=s.value, exs=allExercises();
@@ -485,7 +534,7 @@ function render(){renderTally();renderLegend();renderCalendar();renderDay();rend
 function banner(text,warn){var b=$('banner');if(!text){b.hidden=true;return;}b.hidden=false;b.textContent=text;b.className='banner'+(warn?' warn':'');}
 function lock(){
   readOnly=true;
-  ['fEx','fKg','fReps','fSets','addBtn'].forEach(function(id){$(id).disabled=true;});
+  ['fEx','fKg','fReps','fSets','addBtn','newEx','newExBtn'].forEach(function(id){$(id).disabled=true;});
   $('openSetup').hidden=true; closeSetup();
 }
 
@@ -508,7 +557,7 @@ function saveMine(){
     }
   });
 }
-function mine(){if(!members[myId])members[myId]={nick:'',photo:'',goal:'',u:0,rep:{},d:{}};return members[myId];}
+function mine(){if(!members[myId])members[myId]={nick:'',photo:'',goal:'',u:0,rep:{},ex:[],d:{}};if(!members[myId].ex)members[myId].ex=[];return members[myId];}
 function addEntry(date,ex,kg,reps,sets){
   var m=mine(); if(!m.d[date])m.d[date]={};
   var id='e'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
@@ -528,6 +577,12 @@ $('todayBtn').addEventListener('click',function(){var t=new Date();vy=t.getFullY
 $('cmpEx').addEventListener('change',renderCompare);
 $('cmpScope').addEventListener('change',renderCompare);
 $('cmpMetric').addEventListener('change',renderCompare);
+$('exToggle').addEventListener('click',function(){
+  var p=$('exPanel'); p.hidden=!p.hidden; this.setAttribute('aria-expanded',p.hidden?'false':'true');
+  if(!p.hidden)$('newEx').focus();
+});
+$('newExBtn').addEventListener('click',addExercise);
+$('newEx').addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();addExercise();}});
 function preview(){
   var kg=num($('fKg').value), reps=Math.round(num($('fReps').value)), p=$('fPrev');
   p.textContent=($('fKg').value!==''&&kg>0&&reps>=1)?'この記録の推定1RM: 約 '+fmtKg(e1rm(kg,reps))+' kg（1回だけ上げられる重さの目安）':'重量と回数を入れると、1回だけ上げられる重さの目安（推定1RM）が出ます。';
@@ -539,7 +594,7 @@ $('form').addEventListener('submit',function(ev){
   if(!ex||$('fKg').value===''||kg<0||kg>999||reps<1||sets<1)return;
   addEntry(sel,ex,kg,reps,sets);
   $('cmpEx').value=ex; renderCompare();
-  $('fEx').value=''; $('fKg').value=''; preview(); $('fEx').focus();
+  $('fKg').value=''; preview(); $('fKg').focus();
 });
 /* ---------- 初期設定（アイコンと名前） ---------- */
 var pendingPhoto='';
@@ -575,7 +630,7 @@ function renderTakeover(first){
 function takeOver(old){ // 以前の自分の記録を写し、古い方は一覧から隠す
   var o=members[old]; if(!o||readOnly||!myId)return;
   var m=mine();
-  m.nick=o.nick; m.photo=o.photo; m.goal=o.goal; m.d=JSON.parse(JSON.stringify(o.d));
+  m.nick=o.nick; m.photo=o.photo; m.goal=o.goal; m.ex=(o.ex||[]).slice(); m.d=JSON.parse(JSON.stringify(o.d));
   m.rep=JSON.parse(JSON.stringify(o.rep||{})); m.rep[old]=Date.now();
   delete members[old];
   closeSetup(); render(); saveMine();
