@@ -253,6 +253,7 @@ input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
       </div>
     </form>
     <div id="takeover" hidden>
+      <h2 id="takeTitle"></h2>
       <p class="note hint">機種変更などで以前から参加していた方は、下から以前の自分を選ぶと、記録とプロフィールを引き継げます。</p>
       <div class="list" id="takeList"></div>
     </div>
@@ -373,7 +374,7 @@ input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
     </div>
   </div>
 </div>
-<p class="note" id="ver" style="text-align:center;flex:none;margin:0 0 4px">版 22</p>
+<p class="note" id="ver" style="text-align:center;flex:none;margin:0 0 4px">版 23</p>
 </div>
 
 <script type="module">
@@ -1013,7 +1014,7 @@ function showPrev(){
 }
 function openSetup(first){
   var m=(myId&&members[myId])||{};
-  endCrop(); pendingPhoto=m.photo||''; $('nickIn').value=m.nick||''; $('goalIn').value=m.goal||''; $('auraIn').checked=m.aura===true; $('crownIn').checked=m.crown===true;
+  pendingMerge=''; endCrop(); pendingPhoto=m.photo||''; $('nickIn').value=m.nick||''; $('goalIn').value=m.goal||''; $('auraIn').checked=m.aura===true; $('crownIn').checked=m.crown===true;
   var mylv=myId?benchLevel(myId):0; $('auraRow').hidden=mylv<1; $('crownRow').hidden=mylv<5;  // 達成した人にだけ出す
   $('setupTitle').textContent=first?'はじめに、アイコンと名前を決めましょう':'自分のプロフィール';
   $('setupGo').textContent=first?'はじめる':'保存する';
@@ -1022,16 +1023,48 @@ function openSetup(first){
   showPrev(); document.body.classList.add('setup-open');
   if(first)$('nickIn').focus();
 }
+var pendingMerge='';
 function renderTakeover(first){
   var box=$('takeList'); box.textContent='';
-  var ids=first?Object.keys(members).filter(function(id){return id!==myId&&members[id].nick;}):[];
+  var ids=Object.keys(members).filter(function(id){return id!==myId&&members[id].nick;});
   $('takeover').hidden=!ids.length;
+  $('takeTitle').textContent=first?'以前のアカウントを引き継ぐ':'アカウントの統合';
   ids.forEach(function(id){
+    if(!first&&pendingMerge===id){ // 統合は元に戻せないので、もう一度確かめる
+      var yes=el('button','btn danger',members[id].nick+' を本当に統合する（元に戻せません）'); yes.type='button';
+      yes.addEventListener('click',function(){pendingMerge='';mergeFrom(id);});
+      var no=el('button','btn','やめる'); no.type='button';
+      no.addEventListener('click',function(){pendingMerge='';renderTakeover(false);});
+      box.appendChild(yes); box.appendChild(no); return;
+    }
     var b=el('button','btn'); b.type='button';
-    b.appendChild(avatar(id)); b.appendChild(el('span',null,members[id].nick+' を引き継ぐ'));
-    b.addEventListener('click',function(){takeOver(id);});
+    b.appendChild(avatar(id)); b.appendChild(el('span',null,members[id].nick+(first?' を引き継ぐ':' を自分に統合する')));
+    b.addEventListener('click',function(){ if(first)takeOver(id); else{pendingMerge=id;renderTakeover(false);} });
     box.appendChild(b);
   });
+}
+function mergeFrom(old){ // 別のアカウントの記録を自分に合わせ、そのアカウントは一覧から隠す
+  var o=members[old]; if(!o||readOnly||!myId)return;
+  var m=mine();
+  Object.keys(o.d).forEach(function(date){
+    if(!m.d[date])m.d[date]={};
+    Object.keys(o.d[date]).forEach(function(id){
+      var e=o.d[date][id], key=id, dup=false;
+      Object.keys(m.d[date]).forEach(function(k){var x=m.d[date][k];if(x.ex===e.ex&&x.kg===e.kg&&x.reps===e.reps&&x.sets===e.sets&&x.t===e.t)dup=true;});
+      if(dup)return;                                  // まったく同じ記録は二重にしない
+      while(m.d[date][key])key+='m';
+      m.d[date][key]={ex:e.ex,kg:e.kg,reps:e.reps,sets:e.sets,t:e.t};
+    });
+  });
+  (o.ex||[]).forEach(function(x){if(m.ex.indexOf(x)<0&&m.ex.length<60)m.ex.push(x);});
+  if(!m.photo)m.photo=o.photo; if(!m.goal)m.goal=o.goal;
+  m.aura=m.aura===true||o.aura===true; m.crown=m.crown===true||o.crown===true; m.seen=Math.max(m.seen||0,o.seen||0);
+  if(!m.rep)m.rep={};
+  Object.keys(o.rep||{}).forEach(function(k){if(k!==myId)m.rep[k]=o.rep[k];});
+  m.rep[old]=Date.now();
+  delete members[old];
+  closeSetup(); render(); saveMine(); checkAchieve();
+  banner(o.nick+' の記録を自分のアカウントに統合しました。');
 }
 function takeOver(old){ // 以前の自分の記録を写し、古い方は一覧から隠す
   var o=members[old]; if(!o||readOnly||!myId)return;
