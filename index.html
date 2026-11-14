@@ -57,6 +57,9 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15p
 .aw canvas{position:absolute;left:50%;top:50%;width:320%;height:320%;transform:translate(-50%,-50%);pointer-events:none;z-index:1}
 .aw.sm .av{border-color:var(--aura);box-shadow:0 0 0 1.5px var(--aura)}
 .hint{display:none!important}
+/* 題名とボタンは「記録」ページの中に置き、スクロールで一緒に流れる。題名だけは初期設定などの画面用に別に持つ */
+#brand2{display:none}
+body.setup-open #brand2,body.nogroup #brand2{display:block}
 label.check{flex-direction:row;align-items:center;gap:8px;font-size:14px;color:var(--ink);cursor:pointer}
 label.check input{width:20px;height:20px;min-height:0;margin:0;accent-color:var(--ink)}
 .lvkey{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted)}
@@ -201,15 +204,7 @@ input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
 </head>
 <body>
 <div class="wrap">
-  <header>
-    <div>
-      <h1>MuscleTempura</h1>
-    </div>
-    <div class="hbtns">
-      <button class="btn" id="inviteBtn" type="button" hidden>招待リンクをコピー</button>
-      <button class="btn" id="openSetup" type="button" hidden>設定</button>
-    </div>
-  </header>
+  <h1 id="brand2">MuscleTempura</h1>
   <div class="banner" id="banner" hidden></div>
 
   <section class="card" id="noGroup" hidden>
@@ -262,6 +257,15 @@ input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
 
   <div id="pager">
   <div class="page" id="page1" role="tabpanel" aria-labelledby="tab1">
+  <header>
+    <div>
+      <h1>MuscleTempura</h1>
+    </div>
+    <div class="hbtns">
+      <button class="btn" id="inviteBtn" type="button" hidden>招待リンクをコピー</button>
+      <button class="btn" id="openSetup" type="button" hidden>設定</button>
+    </div>
+  </header>
   <div class="main">
     <section class="card" aria-label="カレンダー">
       <div class="calhead">
@@ -349,7 +353,7 @@ input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
 
   </div>
   </div>
-<p class="note" id="ver" style="text-align:center;flex:none;margin:0 0 4px">版 17</p>
+<p class="note" id="ver" style="text-align:center;flex:none;margin:0 0 4px">版 18</p>
 </div>
 
 <script type="module">
