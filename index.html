@@ -57,6 +57,18 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15p
 .aw canvas{position:absolute;left:50%;top:50%;width:320%;height:320%;transform:translate(-50%,-50%);pointer-events:none;z-index:1}
 .aw.sm .av{border-color:var(--aura);box-shadow:0 0 0 1.5px var(--aura)}
 .hint{display:none!important}
+.phd{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.phd .pname{min-width:0}
+.ptog{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:none;border-radius:999px;padding:2px 6px 2px 12px;min-height:30px;font-size:12px;color:var(--muted);flex:none}
+.ptog b{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:var(--ink);color:var(--bg);font-size:14px;line-height:1}
+.exline{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:2px 10px;padding-left:34px}
+.exline>b{font-size:14px;overflow-wrap:anywhere;max-width:100%;flex:0 0 auto}
+.exline .sets{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end;align-items:center;flex:1 1 auto}
+.exline small{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.setchip{display:inline-flex;align-items:center;gap:2px;border:1px solid var(--line);border-radius:6px;padding:0 6px;font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.setchip button{border:none;background:none;color:var(--muted);padding:0 2px 0 4px;min-height:24px;font-size:15px;line-height:1}
+.setchip button:hover{color:var(--warn)}
+.nonote{margin:0;padding-top:10px;border-top:1px solid var(--line)}
 .calopt{display:flex;justify-content:flex-end}
 .calopt .btn{min-height:30px;padding:2px 12px;font-size:12px}
 .calopt[hidden]{display:none}
@@ -457,7 +469,7 @@ input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
     </div>
   </div>
 </div>
-<p class="note" id="ver" style="text-align:center;flex:none;margin:0 0 4px">版 29</p>
+<p class="note" id="ver" style="text-align:center;flex:none;margin:0 0 4px">版 30</p>
 </div>
 
 <script type="module">
@@ -762,45 +774,59 @@ function renderCalendar(){
   })(d);}
   renderCalZap();
 }
+var dayOpen={};  // その日の記録を開いている人
 function renderDay(){
   var p=sel.split('-'), dt=new Date(+p[0],+p[1]-1,+p[2]);
   $('dayTitle').textContent=(+p[1])+'月'+(+p[2])+'日（'+DOW[dt.getDay()]+'）の記録';
   var list=$('dayList'); list.textContent='';
   var ids=order();
   if(!ids.length){list.appendChild(el('p','note','まだ誰も記録していません。下のフォームから最初の記録を入れてください。'));}
+  // 記録のある人だけを1行ずつ出し、押すと中身が開く。自分は最初から開いておく
+  var none=[];
   ids.forEach(function(uid){
-    var box=el('div','person'), head=el('div','pname');
-    head.appendChild(avatar(uid)); head.appendChild(el('span',null,nameOf(uid))); linkMine(head,uid); box.appendChild(head);
-    if(members[uid].goal)box.appendChild(el('div','gline','目標: '+members[uid].goal));
     var es=entries(uid,sel);
-    if(!es.length)box.appendChild(el('div','empty','この日の記録はありません'));
-    es.forEach(function(e){
-      var row=el('div','entry');
-      row.appendChild(el('span','ex',e.ex));
-      if(e.c){ // 有酸素: 時間を大きく、ほかの項目は入っているものだけ
-        row.appendChild(el('span','kg',fmtKg(e.min)+' 分'));
-        var bits=[]; if(e.km>0)bits.push(fmtKg(e.km)+' km'); if(e.kmh>0)bits.push('時速 '+fmtKg(e.kmh)+' km'); if(e.met>0)bits.push(fmtKg(e.met)+' メッツ');
-        if(bits.length)row.appendChild(el('span','rs',bits.join('・')));
-        if(e.kcal>0)row.appendChild(el('span','rm',Math.round(e.kcal)+' kcal'));
-      }else{
-      row.appendChild(el('span','kg',fmtKg(e.kg)+' kg'));
-      row.appendChild(el('span','rs',e.reps+'回 × '+e.sets+'セット'));
-      row.appendChild(el('span','rm','推定1RM '+fmtKg(e1rm(e.kg,e.reps))+' kg'));
-      }
-      if(!e.c&&uid!==myId&&myId){
-        var mine=best(myId,e.ex,null,true);
-        if(mine!==null)row.appendChild(diffChip(e1rm(e.kg,e.reps)-mine,'自分の推定1RM比 '));
-      }
-      if(uid===myId&&!readOnly){
-        var x=el('button','x','削除'); x.type='button';
-        x.setAttribute('aria-label',e.ex+' の記録を削除');
-        x.addEventListener('click',function(){removeEntry(sel,e.id);});
-        row.appendChild(x);
-      }
-      box.appendChild(row);
-    });
+    if(!es.length&&uid!==myId){none.push(nameOf(uid));return;}   // 記録のない人は、最後に名前だけまとめて出す
+    var open=dayOpen[uid]===undefined?uid===myId:dayOpen[uid];
+    var box=el('div','person'), hd=el('div','phd'), head=el('div','pname');
+    head.appendChild(avatar(uid)); head.appendChild(el('span',null,nameOf(uid))); linkMine(head,uid); hd.appendChild(head);
+    // 種目ごとにまとめる
+    var groups=[], gi={};
+    es.forEach(function(e){ if(gi[e.ex]===undefined){gi[e.ex]=groups.length;groups.push({ex:e.ex,list:[]});} groups[gi[e.ex]].list.push(e); });
+    if(es.length){
+      var parts=[]; groups.forEach(function(g){var p=partOf(g.ex);if(parts.indexOf(p)<0)parts.push(p);});
+      parts.sort(function(a,b){return PARTS.indexOf(a)-PARTS.indexOf(b);});
+      var tg=el('button','ptog'); tg.type='button'; tg.setAttribute('aria-expanded',open?'true':'false');
+      tg.setAttribute('aria-label',nameOf(uid)+' の記録を'+(open?'閉じる':'開く'));
+      tg.appendChild(el('span',null,parts.join('・')+'　'+groups.length+'種目')); tg.appendChild(el('b',null,open?'−':'＋'));
+      tg.addEventListener('click',function(){dayOpen[uid]=!open;renderDay();});
+      hd.appendChild(tg);
+    }else hd.appendChild(el('span','note','記録なし'));
+    box.appendChild(hd);
+    if(open&&es.length){
+      groups.forEach(function(g){
+        var line=el('div','exline'), sets=el('div','sets'), rm=0;
+        line.appendChild(el('b',null,g.ex));
+        g.list.forEach(function(e){
+          var chip=el('span','setchip'), txt;
+          if(e.c){
+            var bits=[fmtKg(e.min)+'分']; if(e.km>0)bits.push(fmtKg(e.km)+'km'); if(e.kcal>0)bits.push(Math.round(e.kcal)+'kcal');
+            txt=bits.join('・');
+          }else{ txt=fmtKg(e.kg)+'kg × '+e.reps+'回'+(e.sets>1?' × '+e.sets:''); rm=Math.max(rm,e1rm(e.kg,e.reps)); }
+          chip.appendChild(el('span',null,txt));
+          if(uid===myId&&!readOnly){
+            var x=el('button',null,'×'); x.type='button'; x.setAttribute('aria-label',g.ex+' '+txt+' の記録を削除');
+            x.addEventListener('click',function(){removeEntry(sel,e.id);});
+            chip.appendChild(x);
+          }
+          sets.appendChild(chip);
+        });
+        if(rm>0)sets.appendChild(el('small',null,'1RM '+fmtKg(rm)));
+        line.appendChild(sets); box.appendChild(line);
+      });
+    }
     list.appendChild(box);
   });
+  if(none.length)list.appendChild(el('p','note nonote','記録なし: '+none.join('、')));
   renderExercises();
 }
 function exOptions(){ // 自分で追加した種目・基本の種目・みんなが記録した種目を、名前の順に
