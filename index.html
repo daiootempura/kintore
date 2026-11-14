@@ -84,7 +84,12 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15p
 .phead div{display:flex;flex-direction:column;min-width:0}
 .phead b{font-size:20px;overflow-wrap:anywhere}
 .phead span{font-size:13px;color:var(--muted);overflow-wrap:anywhere}
-#prof h3{font-size:14px;margin:0}
+#prof h3{font-size:13px;margin:0}
+.psec{display:flex;flex-direction:column;gap:8px}
+.psec h3{align-self:flex-start;background:var(--ink);color:var(--bg);border-radius:999px;padding:1px 12px;font-weight:700}
+.psec .prow:first-of-type{border-top:none;padding-top:0}
+.parts{display:flex;flex-wrap:wrap;gap:6px;padding:2px 0 6px}
+.parts .btn{min-height:34px;padding:2px 12px}
 .prow{display:flex;justify-content:space-between;align-items:center;gap:10px;border-top:1px solid var(--line);padding-top:10px}
 .prow>div{display:flex;flex-direction:column;min-width:0}
 .prow b{overflow-wrap:anywhere}
@@ -368,7 +373,9 @@ input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
               </label>
               <button class="btn" id="newExBtn" type="button">追加</button>
             </div>
-            <label class="check" for="newExCardio"><input type="checkbox" id="newExCardio"> 有酸素の種目として追加する</label>
+            <label for="newExPart">部位
+              <select id="newExPart"><option value="">名前から自動で決める</option><option>胸</option><option>肩</option><option>背中</option><option>脚</option><option>腕</option><option>腹</option><option>その他</option><option>有酸素</option></select>
+            </label>
             <div class="exMine" id="exMine"></div>
           </div>
         </div>
@@ -450,7 +457,7 @@ input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
     </div>
   </div>
 </div>
-<p class="note" id="ver" style="text-align:center;flex:none;margin:0 0 4px">版 28</p>
+<p class="note" id="ver" style="text-align:center;flex:none;margin:0 0 4px">版 29</p>
 </div>
 
 <script type="module">
@@ -462,6 +469,21 @@ import {getFirestore,collection,doc,setDoc,getDoc,deleteDoc,onSnapshot} from './
 'use strict';
 var BASE_EX=['ベンチプレス','スクワット','デッドリフト','ショルダープレス','ラットプルダウン','懸垂','ベントオーバーロウ','アームカール','レッグプレス','ダンベルプレス'];
 var BASE_CARDIO=['ランニング','ウォーキング','サイクリング','エアロバイク','水泳','縄跳び'];
+var PARTS=['胸','肩','背中','脚','腕','腹','その他','有酸素'];
+var BASE_PART={'ベンチプレス':'胸','ダンベルプレス':'胸','ショルダープレス':'肩','デッドリフト':'背中','ラットプルダウン':'背中','懸垂':'背中','ベントオーバーロウ':'背中','スクワット':'脚','レッグプレス':'脚','アームカール':'腕'};
+var PART_WORDS=[ // 名前から部位を推し量るための言葉（上から順に調べる）
+  ['腹',['レッグレイズ','クランチ','プランク','シットアップ','アブ','腹']],
+  ['肩',['ショルダー','レイズ','アップライト','肩']],
+  ['胸',['ベンチ','チェスト','フライ','ディップ','腕立て','プッシュアップ','胸']],
+  ['背中',['ラット','ロウ','ロー','懸垂','チンニング','デッド','プルダウン','背']],
+  ['脚',['スクワット','レッグ','ランジ','カーフ','ヒップ','脚']],
+  ['腕',['カール','トライセプ','プレスダウン','キックバック','腕']]];
+var catMap={};  // みんなが種目に付けた部位
+function guessPart(ex){
+  for(var i=0;i<PART_WORDS.length;i++){for(var k=0;k<PART_WORDS[i][1].length;k++){if(ex.indexOf(PART_WORDS[i][1][k])>=0)return PART_WORDS[i][0];}}
+  return 'その他';
+}
+function partOf(ex){ return isCardio(ex)?'有酸素':(catMap[ex]||BASE_PART[ex]||guessPart(ex)); }
 var cardioSet={}; BASE_CARDIO.forEach(function(x){cardioSet[x]=1;});  // 有酸素として扱う種目名
 var DOW=['日','月','火','水','木','金','土'];
 
@@ -491,6 +513,7 @@ function clean(raw){ // 共有データは信用せず、形を整えてから�
   if(typeof raw.nick==='string')out.nick=raw.nick.slice(0,20);
   if(typeof raw.goal==='string')out.goal=raw.goal.trim().slice(0,60);
   out.u=num(raw.u);
+  out.cat={}; if(raw.cat&&typeof raw.cat==='object')Object.keys(raw.cat).slice(0,80).forEach(function(k){var n=k.trim().slice(0,40),p=raw.cat[k];if(n&&PARTS.indexOf(p)>=0&&p!=='有酸素')out.cat[n]=p;});
   out.cex=[]; if(Array.isArray(raw.cex))raw.cex.slice(0,60).forEach(function(x){if(typeof x==='string'){x=x.trim().slice(0,40);if(x&&out.cex.indexOf(x)<0)out.cex.push(x);}});
   if(raw.aura===true)out.aura=true;       // 稲妻は、達成時の提案で「付ける」を選んだ人だけ
   if(raw.crown===true)out.crown=true;
@@ -619,22 +642,27 @@ function openProfile(uid){
     var d=el('div'); d.appendChild(el('span',null,t[0])); var b=el('b',null,String(t[1])); b.appendChild(el('small',null,'日')); d.appendChild(b); tl.appendChild(d);
   });
   box.appendChild(tl);
-  box.appendChild(el('h3',null,'種目ごとの最高重量'));
   var list=bestsOf(uid);
   if(!list.length)box.appendChild(el('p','note','筋トレの記録はまだありません'));
-  list.forEach(function(o){
-    var row=el('div','prow'), l=el('div'), r=el('div','r');
-    l.appendChild(el('b',null,o.ex));
-    var p=o.date.split('-'); l.appendChild(el('span',null,(+p[1])+'/'+(+p[2])+'・'+o.reps+'回・推定1RM '+fmtKg(o.rm)+' kg'));
-    r.appendChild(el('b','kg',fmtKg(o.kg)+' kg'));
-    if(myId&&uid!==myId){var mb=best(myId,o.ex,null,false);if(mb!==null)r.appendChild(diffChip(o.kg-mb,'自分との差 '));}
-    row.appendChild(l); row.appendChild(r); box.appendChild(row);
+  PARTS.forEach(function(part){ // 胸・肩・背中…と部位ごとにまとめる
+    var items=list.filter(function(o){return partOf(o.ex)===part;});
+    if(!items.length)return;
+    var sec=el('div','psec'); sec.appendChild(el('h3',null,part));
+    items.forEach(function(o){
+      var row=el('div','prow'), l=el('div'), r=el('div','r');
+      l.appendChild(el('b',null,o.ex));
+      var p=o.date.split('-'); l.appendChild(el('span',null,(+p[1])+'/'+(+p[2])+'・'+o.reps+'回・推定1RM '+fmtKg(o.rm)+' kg'));
+      r.appendChild(el('b','kg',fmtKg(o.kg)+' kg'));
+      if(myId&&uid!==myId){var mb=best(myId,o.ex,null,false);if(mb!==null)r.appendChild(diffChip(o.kg-mb,'自分との差 '));}
+      row.appendChild(l); row.appendChild(r); sec.appendChild(row);
+    });
+    box.appendChild(sec);
   });
   // 有酸素: 期間を選んで、平均消費カロリーなどを見る
   var cardio=[];
   Object.keys(m.d).forEach(function(date){Object.keys(m.d[date]).forEach(function(id){var e=m.d[date][id];if(e.c)cardio.push({date:date,e:e});});});
   if(cardio.length){
-    box.appendChild(el('h3',null,'有酸素'));
+    var csec=el('div','psec'); csec.appendChild(el('h3',null,'有酸素')); box.appendChild(csec);
     var today=new Date(), from0=new Date(today.getFullYear(),today.getMonth(),today.getDate()-29);
     var rg=el('div','range'), f1=document.createElement('input'), f2=document.createElement('input'), out=el('div','tally cstat');
     f1.type='date'; f2.type='date'; f1.id='cFrom'; f2.id='cTo'; f1.value=key(from0); f2.value=key(today);
@@ -799,21 +827,24 @@ function choosePick(x){
   var p=pickFor; if(!p)return;
   p.b.ex=x; $('pick').hidden=true; pickFor=null; renderBlocks('ex'+p.bi); preview();
 }
-function addName(x,cardio){ // 新しい種目名を自分の一覧に加える
+function addName(x,part){ // 新しい種目名を、部位を付けて自分の一覧に加える
   var m=mine(); x=(x||'').trim().slice(0,40); if(!x)return '';
   if(m.ex.indexOf(x)<0){
     if(m.ex.length>=60){banner('自分の種目は60個までです。使わない種目を削除してから追加してください。',true);return '';}
     m.ex.push(x);
   }
-  if(cardio&&m.cex.indexOf(x)<0)m.cex.push(x);
+  if(PARTS.indexOf(part)<0)part=guessPart(x);
+  m.cex=m.cex.filter(function(y){return y!==x;}); delete m.cat[x];
+  if(part==='有酸素')m.cex.push(x); else m.cat[x]=part;
   return x;
 }
 function renderPick(){
   var raw=$('pickQ').value.trim(), q=kana(raw), box=$('pickList'), n=0, exact=false; box.textContent='';
-  [['筋トレ',false],['有酸素',true]].forEach(function(g){
-    var items=exOptions().filter(function(x){return isCardio(x)===g[1]&&(!q||kana(x).indexOf(q)>=0);});
+  var opts=exOptions();
+  PARTS.forEach(function(part){ // 部位ごとにまとめて並べる
+    var items=opts.filter(function(x){return partOf(x)===part&&(!q||kana(x).indexOf(q)>=0);});
     if(!items.length)return;
-    box.appendChild(el('h3',null,g[0]));
+    box.appendChild(el('h3',null,part));
     items.forEach(function(x){
       if(kana(x)===q)exact=true;
       var bt=el('button','pitem'+(pickFor&&pickFor.b.ex===x?' on':''),x); bt.type='button';
@@ -822,13 +853,15 @@ function renderPick(){
     });
   });
   if(!n)box.appendChild(el('p','note','「'+raw+'」に合う種目はありません'));
-  if(raw&&!exact&&myId&&!readOnly){ // 見つからない名前は、その場で追加できる
-    box.appendChild(el('h3',null,'新しく追加'));
-    [['「'+raw+'」を筋トレの種目として追加',false],['「'+raw+'」を有酸素の種目として追加',true]].forEach(function(o){
-      var bt=el('button','pitem',o[0]); bt.type='button';
-      bt.addEventListener('click',function(){var x=addName(raw,o[1]);if(!x)return;render();choosePick(x);saveMine();});
-      box.appendChild(bt);
+  if(raw&&!exact&&myId&&!readOnly){ // 見つからない名前は、部位を選んでその場で追加できる
+    box.appendChild(el('h3',null,'「'+raw+'」を新しく追加（部位を選ぶ）'));
+    var wrapP=el('div','parts'), g=guessPart(raw);
+    PARTS.forEach(function(part){
+      var bt=el('button','btn'+(part===g?' primary':''),part); bt.type='button';
+      bt.addEventListener('click',function(){var x=addName(raw,part);if(!x)return;render();choosePick(x);saveMine();});
+      wrapP.appendChild(bt);
     });
+    box.appendChild(wrapP);
   }
 }
 $('pickQ').addEventListener('input',renderPick);
@@ -844,10 +877,10 @@ function renderExercises(){ // 種目の選択肢: 自分で追加した種目 �
   var box=$('exMine'); box.textContent='';
   if(!myEx().length)box.appendChild(el('span','note','自分で追加した種目はまだありません。'));
   myEx().slice().sort(function(a,b){return a.localeCompare(b,'ja');}).forEach(function(x){
-    var c=el('span','chip'); c.appendChild(el('span',null,x+(isCardio(x)?'（有酸素）':'')));
+    var c=el('span','chip'); c.appendChild(el('span',null,x+'（'+partOf(x)+'）'));
     if(!readOnly){
       var b=el('button',null,'削除'); b.type='button'; b.setAttribute('aria-label',x+' を自分の種目から削除');
-      b.addEventListener('click',function(){var m=mine();m.ex=m.ex.filter(function(y){return y!==x;});m.cex=m.cex.filter(function(y){return y!==x;});render();saveMine();});
+      b.addEventListener('click',function(){var m=mine();m.ex=m.ex.filter(function(y){return y!==x;});m.cex=m.cex.filter(function(y){return y!==x;});delete m.cat[x];render();saveMine();});
       c.appendChild(b);
     }
     box.appendChild(c);
@@ -856,8 +889,8 @@ function renderExercises(){ // 種目の選択肢: 自分で追加した種目 �
 function addExercise(){
   if(readOnly||!myId)return;
   if(!$('newEx').value.trim()){$('newEx').focus();return;}
-  var x=addName($('newEx').value,$('newExCardio').checked); if(!x)return;
-  $('newEx').value=''; $('newExCardio').checked=false; render(); blocks[blocks.length-1].ex=x; renderBlocks(); saveMine();
+  var x=addName($('newEx').value,$('newExPart').value); if(!x)return;
+  $('newEx').value=''; $('newExPart').value=''; render(); blocks[blocks.length-1].ex=x; renderBlocks(); saveMine();
 }
 var openCharts={};
 function renderCompare(){ // 種目の一覧だけを出し、「グラフ」を押した種目だけ縦棒グラフを開く
@@ -966,12 +999,13 @@ function renderAdmin(){
   });
 }
 function refreshCardio(){ // 基本の有酸素種目＋誰かが有酸素として登録・記録した種目
-  var set={}; BASE_CARDIO.forEach(function(x){set[x]=1;});
+  var set={}, cats={}; BASE_CARDIO.forEach(function(x){set[x]=1;});
   Object.keys(members).forEach(function(u){
     var m=members[u]; (m.cex||[]).forEach(function(x){set[x]=1;});
+    Object.keys(m.cat||{}).forEach(function(k){if(u===myId||!cats[k])cats[k]=m.cat[k];});   // 自分の付けた部位を優先
     Object.keys(m.d).forEach(function(k){Object.keys(m.d[k]).forEach(function(id){if(m.d[k][id].c)set[m.d[k][id].ex]=1;});});
   });
-  cardioSet=set;
+  cardioSet=set; catMap=cats;
 }
 function isCardio(ex){return !!cardioSet[ex];}
 function render(){refreshCardio();renderAdmin();renderTally();renderLegend();renderCalendar();renderDay();renderCompare();}
@@ -1003,7 +1037,7 @@ function saveMine(){
     }
   });
 }
-function mine(){if(!members[myId])members[myId]={nick:'',photo:'',goal:'',u:0,rep:{},ex:[],d:{}};if(!members[myId].ex)members[myId].ex=[];if(!members[myId].cex)members[myId].cex=[];return members[myId];}
+function mine(){if(!members[myId])members[myId]={nick:'',photo:'',goal:'',u:0,rep:{},ex:[],d:{}};if(!members[myId].ex)members[myId].ex=[];if(!members[myId].cex)members[myId].cex=[];if(!members[myId].cat)members[myId].cat={};return members[myId];}
 function addEntry(date,ex,kg,reps,sets){
   var m=mine(); if(!m.d[date])m.d[date]={};
   var id='e'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
@@ -1324,6 +1358,7 @@ function mergeFrom(old){ // 別のアカウントの記録を自分に合わせ�
   });
   (o.ex||[]).forEach(function(x){if(m.ex.indexOf(x)<0&&m.ex.length<60)m.ex.push(x);});
   (o.cex||[]).forEach(function(x){if(m.cex.indexOf(x)<0)m.cex.push(x);});
+  Object.keys(o.cat||{}).forEach(function(k){if(!m.cat[k])m.cat[k]=o.cat[k];});
   if(!m.photo)m.photo=o.photo; if(!m.goal)m.goal=o.goal;
   m.aura=m.aura===true||o.aura===true; m.crown=m.crown===true||o.crown===true; m.seen=Math.max(m.seen||0,o.seen||0);
   if(!m.rep)m.rep={};
@@ -1336,7 +1371,7 @@ function mergeFrom(old){ // 別のアカウントの記録を自分に合わせ�
 function takeOver(old){ // 以前の自分の記録を写し、古い方は一覧から隠す
   var o=members[old]; if(!o||readOnly||!myId)return;
   var m=mine();
-  m.nick=o.nick; m.photo=o.photo; m.goal=o.goal; m.aura=o.aura===true; m.crown=o.crown===true; m.seen=o.seen||0; m.ex=(o.ex||[]).slice(); m.cex=(o.cex||[]).slice(); m.d=JSON.parse(JSON.stringify(o.d));
+  m.nick=o.nick; m.photo=o.photo; m.goal=o.goal; m.aura=o.aura===true; m.crown=o.crown===true; m.seen=o.seen||0; m.ex=(o.ex||[]).slice(); m.cex=(o.cex||[]).slice(); m.cat=JSON.parse(JSON.stringify(o.cat||{})); m.d=JSON.parse(JSON.stringify(o.d));
   m.rep=JSON.parse(JSON.stringify(o.rep||{})); m.rep[old]=Date.now();
   delete members[old];
   closeSetup(); render(); saveMine();
