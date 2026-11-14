@@ -43,6 +43,23 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15p
 #tabs{display:flex;align-self:center;border:1px solid var(--line);border-radius:999px;padding:2px;flex:none}
 #tabs button{border:none;background:none;border-radius:999px;padding:4px 20px;min-height:34px}
 #tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);font-weight:700}
+/* ベンチプレスの到達重量でアイコンに付く稲妻（60kg 緑・70kg 青・80kg 赤） */
+.aw{position:relative;display:inline-flex;flex:none;--aura:#1faa4b}
+.aw.lv2{--aura:#1f7ae0}
+.aw.lv3{--aura:#e02b2b}
+.aw .av{border-color:var(--aura);box-shadow:0 0 0 1px var(--aura),0 0 7px 1px var(--aura);animation:auraPulse 1.6s ease-in-out infinite}
+.aw i{position:absolute;width:9px;height:14px;background:var(--aura);clip-path:polygon(58% 0,12% 56%,44% 56%,28% 100%,88% 38%,56% 38%,78% 0);filter:drop-shadow(0 0 2px var(--aura));animation:zap 1.6s steps(1,end) infinite;pointer-events:none}
+.aw i:nth-of-type(1){top:-7px;right:-6px;transform:rotate(18deg)}
+.aw i:nth-of-type(2){bottom:-7px;left:-6px;transform:rotate(198deg);animation-delay:.55s}
+.aw i:nth-of-type(3){top:-6px;left:-5px;transform:rotate(-30deg) scale(.8);animation-delay:1.05s}
+.aw.sm i{display:none}
+.aw.sm .av{box-shadow:0 0 0 1.5px var(--aura);animation:none}
+@keyframes zap{0%{opacity:0}6%{opacity:1}12%{opacity:.15}18%{opacity:1}26%{opacity:.4}32%{opacity:0}100%{opacity:0}}
+@keyframes auraPulse{0%,100%{box-shadow:0 0 0 1px var(--aura),0 0 5px 0 var(--aura)}50%{box-shadow:0 0 0 1px var(--aura),0 0 10px 2px var(--aura)}}
+@media (prefers-reduced-motion: reduce){.aw i{animation:none;opacity:1}.aw .av{animation:none}}
+.lvkey{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted)}
+.lvkey span{display:inline-flex;align-items:center;gap:5px}
+.lvkey em{width:10px;height:10px;border-radius:50%;display:inline-block}
 .mrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;border-top:1px solid var(--line);padding-top:10px}
 .mrow .who{display:flex;align-items:center;gap:8px;min-width:0;flex:1 1 160px}
 .mrow .who div{display:flex;flex-direction:column;min-width:0}
@@ -283,6 +300,12 @@ input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
   <section class="card" aria-label="メンバー">
     <h2>メンバーと今月のトレーニング日数</h2>
     <div class="legend" id="legend"></div>
+    <div class="lvkey" aria-label="アイコンの稲妻の意味">
+      <span>ベンチプレスの記録で稲妻が付きます</span>
+      <span><em style="background:#1faa4b"></em>60 kg</span>
+      <span><em style="background:#1f7ae0"></em>70 kg</span>
+      <span><em style="background:#e02b2b"></em>80 kg</span>
+    </div>
   </section>
   <section class="card" id="adminCard" hidden aria-label="メンバーの管理">
     <h2>メンバーの管理</h2>
@@ -375,7 +398,17 @@ function avatar(uid,small){ // 選んだ写真。未設定なら名前の頭文�
   var m=members[uid]||allMembers[uid]||{}, a=el('span','av'+(small?' sm':''));
   if(m.photo){var im=document.createElement('img');im.src=m.photo;im.alt='';a.appendChild(im);a.className+=' photo';}
   else{var n=(m.nick||names[uid]||'').trim();a.textContent=n?Array.from(n)[0]:'?';a.className+=' mono';}
-  a.setAttribute('aria-hidden','true'); return a;
+  a.setAttribute('aria-hidden','true');
+  var lv=benchLevel(uid); if(!lv)return a;
+  var w=el('span','aw lv'+lv+(small?' sm':'')); w.setAttribute('aria-hidden','true');
+  w.appendChild(a); for(var k=0;k<3;k++)w.appendChild(document.createElement('i'));
+  return w;
+}
+function benchLevel(uid){ // ベンチプレスで実際に記録した最高重量: 60kg→1(緑) 70kg→2(青) 80kg→3(赤)
+  var m=members[uid]||allMembers[uid]; if(!m||!m.d)return 0;
+  var b=0;
+  Object.keys(m.d).forEach(function(date){var day=m.d[date];Object.keys(day).forEach(function(id){if(day[id].ex==='ベンチプレス'&&day[id].kg>b)b=day[id].kg;});});
+  return b>=80?3:b>=70?2:b>=60?1:0;
 }
 function nameOf(uid){
   var m=members[uid]||allMembers[uid]||{};
