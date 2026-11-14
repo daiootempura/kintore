@@ -97,6 +97,8 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15p
 .phead b{font-size:20px;overflow-wrap:anywhere}
 .phead span{font-size:13px;color:var(--muted);overflow-wrap:anywhere}
 #prof h3{font-size:13px;margin:0}
+.parthead{align-self:flex-start;background:var(--ink);color:var(--bg);border-radius:999px;padding:1px 12px;font-size:13px;font-weight:700;margin:8px 0 0}
+.parthead:first-child{margin-top:0}
 .psec{display:flex;flex-direction:column;gap:8px}
 .psec h3{align-self:flex-start;background:var(--ink);color:var(--bg);border-radius:999px;padding:1px 12px;font-weight:700}
 .psec .prow:first-of-type{border-top:none;padding-top:0}
@@ -250,8 +252,8 @@ input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
 .cmphead select{width:auto;max-width:100%}
 .bars{display:flex;flex-direction:column;gap:8px}
 .bars{gap:10px}
-.chead{display:flex;align-items:center;justify-content:space-between;gap:8px;border-bottom:1px solid var(--line);padding-bottom:6px}
-.chead h3{font-size:15px;margin:0;border:none;padding:0;overflow-wrap:anywhere}
+.chead{display:flex;align-items:center;justify-content:space-between;gap:8px;border-bottom:1px solid var(--line);padding:0 0 6px 6px}
+.chart .chead h3{font-size:15px;margin:0;border:none;padding:0;overflow-wrap:anywhere}
 .chead .btn{min-height:30px;padding:2px 12px;font-size:13px;flex:none}
 .vchart{display:flex;align-items:flex-end;gap:10px;overflow-x:auto;padding:18px 4px 6px}
 .vcol{flex:0 0 52px;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0}
@@ -469,7 +471,7 @@ input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
     </div>
   </div>
 </div>
-<p class="note" id="ver" style="text-align:center;flex:none;margin:0 0 4px">版 30</p>
+<p class="note" id="ver" style="text-align:center;flex:none;margin:0 0 4px">版 31</p>
 </div>
 
 <script type="module">
@@ -929,8 +931,12 @@ function renderCompare(){ // 種目の一覧だけを出し、「グラフ」を
     if(rows.length)charts.push({ex:ex,rows:rows.sort(function(a,b){return b.b-a.b;})});
   });
   if(!charts.length){box.appendChild(el('p','note',prefix?'この月の記録はまだありません':'記録はまだありません'));return;}
-  charts.sort(function(a,b){return a.ex.localeCompare(b.ex,'ja');});   // 名前の順
+  // 胸・肩・背中…と部位ごとにまとめ、その中は名前の順
+  charts.sort(function(a,b){return PARTS.indexOf(partOf(a.ex))-PARTS.indexOf(partOf(b.ex))||a.ex.localeCompare(b.ex,'ja');});
+  var lastPart='';
   charts.forEach(function(ch,ci){
+    var part=partOf(ch.ex);
+    if(part!==lastPart){lastPart=part;box.appendChild(el('h3','parthead',part));}
     var blk=el('div','chart'), head=el('div','chead'), open=!!openCharts[ch.ex];
     head.appendChild(el('h3',null,ch.ex));
     var bt=el('button','btn',open?'グラフを閉じる':'グラフ'); bt.type='button'; bt.setAttribute('aria-expanded',open?'true':'false'); bt.setAttribute('aria-controls','vc'+ci);
