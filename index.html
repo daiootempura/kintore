@@ -47,11 +47,10 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15p
 .aw{position:relative;display:inline-flex;flex:none;--aura:#1faa4b}
 .aw.lv2{--aura:#1f7ae0}
 .aw.lv3{--aura:#e02b2b}
-.aw .av{border-color:var(--aura);box-shadow:0 0 0 1px var(--aura),0 0 7px 1px var(--aura);animation:auraPulse 1.6s ease-in-out infinite}
-.aw canvas{position:absolute;left:50%;top:50%;width:56px;height:56px;transform:translate(-50%,-50%);pointer-events:none}
-.aw.sm .av{box-shadow:0 0 0 1.5px var(--aura);animation:none}
-@keyframes auraPulse{0%,100%{box-shadow:0 0 0 1px var(--aura),0 0 5px 0 var(--aura)}50%{box-shadow:0 0 0 1px var(--aura),0 0 10px 2px var(--aura)}}
-@media (prefers-reduced-motion: reduce){.aw .av{animation:none}}
+.aw .av{border-color:#fff;box-shadow:0 0 0 1.5px var(--aura),0 0 7px 2px var(--aura);transition:box-shadow .12s}
+.aw.surge .av{box-shadow:0 0 0 1px #fff,0 0 0 3px var(--aura),0 0 16px 6px var(--aura)}
+.aw canvas{position:absolute;left:50%;top:50%;width:320%;height:320%;transform:translate(-50%,-50%);pointer-events:none;z-index:1}
+.aw.sm .av{border-color:var(--aura);box-shadow:0 0 0 1.5px var(--aura)}
 .lvkey{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted)}
 .lvkey span{display:inline-flex;align-items:center;gap:5px}
 .lvkey em{width:10px;height:10px;border-radius:50%;display:inline-block}
@@ -409,7 +408,7 @@ function avatar(uid,small){ // 選んだ写真。未設定なら名前の頭文�
   a.setAttribute('aria-hidden','true');
   var lv=benchLevel(uid); if(!lv)return a;
   var w=el('span','aw lv'+lv+(small?' sm':'')); w.setAttribute('aria-hidden','true');
-  w.appendChild(a); if(!small){var cv=document.createElement('canvas');cv.width=cv.height=112;w.appendChild(cv);}
+  w.appendChild(a); if(!small){var cv=document.createElement('canvas');cv.dataset.lv=lv;w.appendChild(cv);}
   return w;
 }
 function benchLevel(uid){ // ベンチプレスで実際に記録した最高重量: 60kg→1(緑) 70kg→2(青) 80kg→3(赤)
@@ -810,56 +809,106 @@ $('form').addEventListener('submit',function(ev){
   render(); renderBlocks(); preview(); $('cmpEx').value=firstEx; renderCompare(); saveMine();
 });
 
-/* ---------- 稲妻: アイコンの縁を走る放電を、毎回形を変えて描く ---------- */
+/* ---------- 稲妻: 光る輪から細い電気が走り、ときどき激しく放電する ---------- */
 (function(){
-  var still=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  function isDark(){return getComputedStyle(document.documentElement).getPropertyValue('--bg').trim().toLowerCase()!=='#ffffff';}
-  function bolt(c,cx,cy,r,col){
-    var a=Math.random()*Math.PI*2, span=0.7+Math.random()*1.3, n=9, pts=[], k;
-    for(k=0;k<=n;k++){
-      var t=k/n, ang=a+span*t, env=Math.sin(Math.PI*t);            // 両端は縁に付き、中ほどで外へ跳ねる
-      var rr=r+1+env*(2+Math.random()*9)+(Math.random()-0.5)*3;
-      pts.push([cx+Math.cos(ang)*rr, cy+Math.sin(ang)*rr]);
-    }
-    function path(list){c.beginPath();c.moveTo(list[0][0],list[0][1]);for(var i=1;i<list.length;i++)c.lineTo(list[i][0],list[i][1]);}
-    var branches=[];
-    for(k=2;k<n-1;k++){ if(Math.random()<0.28){ // 枝分かれ
-      var p=pts[k], ang2=Math.atan2(p[1]-cy,p[0]-cx)+(Math.random()-0.5)*1.2, len=5+Math.random()*9;
-      var mid=[p[0]+Math.cos(ang2)*len*0.5+(Math.random()-0.5)*4, p[1]+Math.sin(ang2)*len*0.5+(Math.random()-0.5)*4];
-      branches.push([p,mid,[p[0]+Math.cos(ang2)*len,p[1]+Math.sin(ang2)*len]]);
-    }}
-    c.lineJoin='miter'; c.lineCap='round';
-    c.shadowColor=col; c.shadowBlur=10; c.strokeStyle=col;
-    c.lineWidth=3; path(pts); c.stroke();
-    c.lineWidth=1.6; branches.forEach(function(b){path(b);c.stroke();});
-    if(isDark()){ // 暗い背景では白く光る芯を重ねる。明るい背景では色の線だけの方がはっきり見える
-      c.shadowBlur=0; c.strokeStyle='rgba(255,255,255,.95)';
-      c.lineWidth=1.1; path(pts); c.stroke();
-      c.lineWidth=0.7; branches.forEach(function(b){path(b);c.stroke();});
-    }
+  var still=!!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  var state=new WeakMap(), dark=false, darkAt=0;
+  function rnd(a,b){return a+Math.random()*(b-a);}
+  function isDark(now){
+    if(now-darkAt>1500){darkAt=now;var m=/rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(getComputedStyle(document.body).backgroundColor);dark=m?(+m[1]+ +m[2]+ +m[3])<300:false;}
+    return dark;
   }
-  function frame(){
-    var list=document.querySelectorAll('.aw canvas');
+  // 2点の間を、中点を何度もずらしてギザギザにする（本物の稲妻の形に近い）
+  function jag(x1,y1,x2,y2,rough,depth){
+    var pts=[[x1,y1],[x2,y2]];
+    for(var d=0;d<depth;d++){
+      var out=[pts[0]];
+      for(var i=1;i<pts.length;i++){
+        var a=pts[i-1], b=pts[i], dx=b[0]-a[0], dy=b[1]-a[1], len=Math.sqrt(dx*dx+dy*dy)||1, off=(Math.random()-.5)*len*rough;
+        out.push([(a[0]+b[0])/2-dy/len*off,(a[1]+b[1])/2+dx/len*off],b);
+      }
+      pts=out;
+    }
+    return pts;
+  }
+  function newBolt(R,surge,lv){
+    var t=rnd(0,Math.PI*2), kind=Math.random(), k=surge?1:0, b={life:surge?rnd(2,5):rnd(1,3),w:rnd(.7,1.15)+(surge?.25:0)};
+    b.x1=Math.cos(t)*R; b.y1=Math.sin(t)*R;
+    if(kind<.5){            // 外へ飛ぶ
+      var r2=R*rnd(1.35,1.75+.55*k+.1*lv), t2=t+rnd(-.5,.5);
+      b.x2=Math.cos(t2)*r2; b.y2=Math.sin(t2)*r2; b.rough=.42;
+    }else if(kind<.8){      // 輪に沿って這う
+      var t3=t+rnd(.5,1.2+.5*k)*(Math.random()<.5?1:-1), r3=R*rnd(1.0,1.12);
+      b.x2=Math.cos(t3)*r3; b.y2=Math.sin(t3)*r3; b.rough=.5;
+    }else{                  // 内側へ入り込む
+      var t4=t+rnd(-.9,.9), r4=R*rnd(.35,.8);
+      b.x2=Math.cos(t4)*r4; b.y2=Math.sin(t4)*r4; b.rough=.45;
+    }
+    b.branch=Math.random()<(surge?.75:.4)?{at:rnd(.3,.75),ang:rnd(-1,1),len:rnd(.3,.55)}:null;
+    b.glint=Math.random()<(surge?.8:.35);
+    return b;
+  }
+  function stroke(c,pts,col,core,w,u){
+    c.beginPath(); c.moveTo(pts[0][0],pts[0][1]); for(var i=1;i<pts.length;i++)c.lineTo(pts[i][0],pts[i][1]);
+    c.shadowColor=col; c.shadowBlur=7*u; c.strokeStyle=col; c.globalAlpha=.6; c.lineWidth=2.4*w*u; c.stroke();
+    c.shadowBlur=3*u; c.strokeStyle=core; c.globalAlpha=1; c.lineWidth=(core===col?1.5:.95)*w*u; c.stroke();
+  }
+  function glint(c,x,y,col,core,u,size){ // 稲妻の先で弾ける十字の火花
+    c.shadowColor=col; c.shadowBlur=6*u; c.strokeStyle=core; c.globalAlpha=1; c.lineWidth=.9*u;
+    c.beginPath(); c.moveTo(x-size,y); c.lineTo(x+size,y); c.moveTo(x,y-size); c.lineTo(x,y+size); c.stroke();
+    c.fillStyle=core; c.beginPath(); c.arc(x,y,.9*u,0,Math.PI*2); c.fill();
+  }
+  function drawBolt(c,b,col,core,u){
+    var pts=jag(b.x1,b.y1,b.x2,b.y2,b.rough,4);
+    stroke(c,pts,col,core,b.w,u);
+    if(b.branch){
+      var p=pts[Math.floor(pts.length*b.branch.at)], dx=b.x2-b.x1, dy=b.y2-b.y1, L=Math.sqrt(dx*dx+dy*dy)*b.branch.len, a=Math.atan2(dy,dx)+b.branch.ang;
+      stroke(c,jag(p[0],p[1],p[0]+Math.cos(a)*L,p[1]+Math.sin(a)*L,.5,3),col,core,b.w*.6,u);
+    }
+    if(b.glint)glint(c,b.x2,b.y2,col,core,u,rnd(2.2,4.6)*u);
+  }
+  function frame(now){
+    var list=document.querySelectorAll('.aw canvas'), vw=window.innerWidth, vh=window.innerHeight, dk=isDark(now);
     for(var i=0;i<list.length;i++){
-      var cv=list[i]; if(!cv.offsetParent)continue;
-      var c=cv.getContext('2d'); c.clearRect(0,0,112,112);
-      if(!still&&Math.random()<0.22)continue;                        // ときどき消えて、ちらつかせる
-      var col=getComputedStyle(cv.parentNode).getPropertyValue('--aura').trim()||'#1faa4b';
-      var n=still?2:(1+(Math.random()<0.6?1:0)+(Math.random()<0.25?1:0));
-      for(var k=0;k<n;k++)bolt(c,56,56,27,col);
+      var cv=list[i], wrap=cv.parentNode, box=wrap.getBoundingClientRect();
+      if(!box.width||box.right<0||box.left>vw||box.bottom<0||box.top>vh)continue;   // 画面外は描かない
+      var dpr=Math.min(window.devicePixelRatio||1,3), size=Math.round(box.width*3.2*dpr);
+      if(cv.width!==size){cv.width=size;cv.height=size;}
+      var st=state.get(cv); if(!st){st={bolts:[],next:now+rnd(600,2600),end:0};state.set(cv,st);}
+      var lv=+cv.dataset.lv||1, u=dpr, R=box.width/2*dpr;
+      // ときどき激しくなる（レベルが高いほど頻繁に、長く）
+      if(now>st.next){st.end=now+rnd(350,650)+lv*120;st.next=st.end+rnd(2600,5200)-lv*450;}
+      var surge=now<st.end;
+      if(surge!==st.was){st.was=surge;wrap.classList.toggle('surge',surge);}
+      for(var k=st.bolts.length-1;k>=0;k--){if(--st.bolts[k].life<=0)st.bolts.splice(k,1);}
+      var want=surge?3+lv+Math.floor(Math.random()*2):(Math.random()<.7?1+(Math.random()<.3?1:0):0);
+      while(st.bolts.length<want)st.bolts.push(newBolt(R,surge,lv));
+      var c=cv.getContext('2d'); c.setTransform(1,0,0,1,0,0); c.clearRect(0,0,size,size);
+      if(!surge&&Math.random()<.18)continue;                                        // 一瞬消えて、ちらつく
+      var col=getComputedStyle(wrap).getPropertyValue('--aura').trim()||'#1faa4b';
+      var core=dk?'#ffffff':col;   // 白い画面では白い芯が見えないので、色そのもので描く
+      c.translate(size/2,size/2); c.lineCap='round'; c.lineJoin='round';
+      for(var b=0;b<st.bolts.length;b++)drawBolt(c,st.bolts[b],col,core,u);
+      if(surge){for(var g=0;g<2;g++){var t=rnd(0,Math.PI*2),rr=R*rnd(.95,1.5);glint(c,Math.cos(t)*rr,Math.sin(t)*rr,col,core,u,rnd(1.6,3.4)*u);}}
+      c.globalAlpha=1; c.shadowBlur=0;
     }
   }
-  var last=0;
-  function loop(t){ if(t-last>(still?100000:75)){last=t;frame();} requestAnimationFrame(loop); }
-  if(still){ // 動きを減らす設定の人には、描き直さず静止した稲妻を見せる
-    var seen=new WeakSet();
+  if(still){ // 動きを減らす設定の人には、静止した稲妻を一度だけ描く
+    var done=new WeakSet();
     setInterval(function(){
       var l=document.querySelectorAll('.aw canvas');
-      for(var i=0;i<l.length;i++){ if(seen.has(l[i])||!l[i].offsetParent)continue; seen.add(l[i]);
-        var c=l[i].getContext('2d'), col=getComputedStyle(l[i].parentNode).getPropertyValue('--aura').trim()||'#1faa4b';
-        bolt(c,56,56,27,col); bolt(c,56,56,27,col); }
-    },400);
-  }else requestAnimationFrame(loop);
+      for(var i=0;i<l.length;i++){
+        var cv=l[i], box=cv.parentNode.getBoundingClientRect(); if(done.has(cv)||!box.width)continue; done.add(cv);
+        var dpr=Math.min(window.devicePixelRatio||1,3), size=Math.round(box.width*3.2*dpr); cv.width=cv.height=size;
+        var c=cv.getContext('2d'), col=getComputedStyle(cv.parentNode).getPropertyValue('--aura').trim()||'#1faa4b';
+        c.translate(size/2,size/2); c.lineCap='round';
+        for(var k=0;k<3;k++)drawBolt(c,newBolt(box.width/2*dpr,false,+cv.dataset.lv||1),col,'#ffffff',dpr);
+      }
+    },500);
+  }else{
+    var last=0;
+    (function loop(t){ if(t-last>55){last=t;frame(t);} requestAnimationFrame(loop); })(0);
+  }
 })();
 
 /* ---------- ページ切り替え（タブと左右スワイプ） ---------- */
