@@ -353,7 +353,7 @@ input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
 
   </div>
   </div>
-<p class="note" id="ver" style="text-align:center;flex:none;margin:0 0 4px">版 19</p>
+<p class="note" id="ver" style="text-align:center;flex:none;margin:0 0 4px">版 20</p>
 </div>
 
 <script type="module">
@@ -1095,7 +1095,7 @@ function moveFrom(old){ // 前のグループの自分の記録を今のグル�
   });
 }
 function parseGid(text){var m=/(?:[?&]g=|^)([A-Za-z0-9]{8,32})(?:&|$)/.exec((text||'').trim());return m?m[1]:'';}
-function goGroup(g){location.assign(location.pathname+'?g='+g);}
+function goGroup(g){store('mt_carry',g);location.assign(location.pathname+'?g='+g);} // アプリ内の操作で移るときだけ記録を持っていく
 $('reissueBtn').addEventListener('click',function(){
   if(readOnly||!myId||!gid)return;
   var box=$('reissueBox'); box.textContent='';
@@ -1142,8 +1142,9 @@ function startGroup(){
           if(!readOnly){$('openSetup').hidden=false;if(!members[myId].nick)openSetup(true);}
           render();
         };
-        // 前に別のリンクのグループにいた端末なら、自分の記録を新しいグループへ移す
-        if(prevGid&&prevGid!==gid&&!hasMine&&!readOnly)moveFrom(prevGid).then(fin,fin); else fin();
+        // アプリ内の「作り直す」「移動」で来たときだけ、前のグループの自分の記録を移す（リンクを開いただけなら新規参加）
+        var carry=load('mt_carry')===gid; store('mt_carry','');
+        if(carry&&prevGid&&prevGid!==gid&&!hasMine&&!readOnly)moveFrom(prevGid).then(fin,fin); else fin();
       }
     }
     render();
