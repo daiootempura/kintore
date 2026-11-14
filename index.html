@@ -51,6 +51,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15p
 .aw.surge .av{box-shadow:0 0 0 1px #fff,0 0 0 3px var(--aura),0 0 16px 6px var(--aura)}
 .aw canvas{position:absolute;left:50%;top:50%;width:320%;height:320%;transform:translate(-50%,-50%);pointer-events:none;z-index:1}
 .aw.sm .av{border-color:var(--aura);box-shadow:0 0 0 1.5px var(--aura)}
+.hint{display:none!important}
 .lvkey{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted)}
 .lvkey span{display:inline-flex;align-items:center;gap:5px}
 .lvkey em{width:10px;height:10px;border-radius:50%;display:inline-block}
@@ -207,13 +208,13 @@ input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
   <section class="card" id="noGroup" hidden>
     <h2>グループを作りましょう</h2>
     <p class="note">友達から招待リンクを受け取っている場合は、ここでは作らずに、そのリンクから開いてください。</p>
-    <p class="note">新しく始める場合は、下のボタンでグループを作り、できた招待リンクを友達に送ります。</p>
+    <p class="note hint">新しく始める場合は、下のボタンでグループを作り、できた招待リンクを友達に送ります。</p>
     <div><button class="btn primary" id="makeGroup" type="button">新しいグループを作る</button></div>
   </section>
 
   <section class="card" id="setup" aria-labelledby="setupTitle">
     <h2 id="setupTitle"></h2>
-    <p class="note">友達の画面には、ここで決めたアイコンと名前で表示されます。あとから「設定」で変えられます。</p>
+    <p class="note hint">友達の画面には、ここで決めたアイコンと名前で表示されます。あとから「設定」で変えられます。</p>
     <form id="setupForm" class="setupForm">
       <div class="photoRow">
         <span id="photoPrev"></span>
@@ -225,9 +226,9 @@ input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
         <label for="cropZoom">拡大
           <input id="cropZoom" type="range" min="1" max="4" step="0.01" value="1">
         </label>
-        <p class="note">写真をドラッグして、丸の中に入れたい所を合わせてください。</p>
+        <p class="note hint">写真をドラッグして、丸の中に入れたい所を合わせてください。</p>
       </div>
-      <p class="note">丸の中に見えている範囲が、小さく縮小されてアイコンになります。写真を選ばない場合は名前の頭文字がアイコンになります。</p>
+      <p class="note hint">丸の中に見えている範囲が、小さく縮小されてアイコンになります。写真を選ばない場合は名前の頭文字がアイコンになります。</p>
       <label for="nickIn">名前
         <input id="nickIn" maxlength="20" required placeholder="例: ケン">
       </label>
@@ -240,7 +241,7 @@ input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
       </div>
     </form>
     <div id="takeover" hidden>
-      <p class="note">機種変更などで以前から参加していた方は、下から以前の自分を選ぶと、記録とプロフィールを引き継げます。</p>
+      <p class="note hint">機種変更などで以前から参加していた方は、下から以前の自分を選ぶと、記録とプロフィールを引き継げます。</p>
       <div class="list" id="takeList"></div>
     </div>
     <p class="note" id="homeHint">ホーム画面に追加して使う場合は、先に追加してから、そのアイコンで開いて設定してください（ブラウザとホーム画面のアプリは別の人として扱われます）。</p>
@@ -296,7 +297,7 @@ input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
   <section class="card" aria-label="メンバー">
     <h2>メンバーと今月のトレーニング日数</h2>
     <div class="legend" id="legend"></div>
-    <div class="lvkey" aria-label="アイコンの稲妻の意味">
+    <div class="lvkey hint" aria-label="アイコンの稲妻の意味">
       <span>ベンチプレスの記録で稲妻が付きます</span>
       <span><em style="background:#1faa4b"></em>60 kg</span>
       <span><em style="background:#1f7ae0"></em>70 kg</span>
@@ -305,7 +306,7 @@ input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
   </section>
   <section class="card" id="linkCard" aria-label="招待リンク">
     <h2>招待リンク</h2>
-    <p class="note">招待リンクを作り直すと、新しいリンクのグループに自分の記録ごと移ります。友達には新しいリンクを送り直してください。前のリンクでは、移った人の記録は見えなくなります。</p>
+    <p class="note hint">招待リンクを作り直すと、新しいリンクのグループに自分の記録ごと移ります。友達には新しいリンクを送り直してください。前のリンクでは、移った人の記録は見えなくなります。</p>
     <div class="acts" id="reissueBox"><button class="btn" id="reissueBtn" type="button">招待リンクを作り直す</button></div>
     <div class="exAdd">
       <label for="moveIn">新しい招待リンクを受け取った場合は、ここに貼り付けて移動
@@ -338,7 +339,7 @@ input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
 
   </div>
   </div>
-<p class="note" id="ver" style="text-align:center;flex:none;margin:0 0 4px">版 15</p>
+<p class="note" id="ver" style="text-align:center;flex:none;margin:0 0 4px">版 16</p>
 </div>
 
 <script type="module">
@@ -567,7 +568,7 @@ function renderCompare(){
   exs.forEach(function(x){var o=document.createElement('option');o.value=x;o.textContent=x;s.appendChild(o);});
   if(exs.indexOf(cur)>=0)s.value=cur;
   var box=$('bars'); box.textContent='';
-  if(!exs.length){box.appendChild(el('p','note','記録が入ると、ここに種目ごとの最高重量と差が並びます。'));return;}
+  if(!exs.length){box.appendChild(el('p','note hint','記録が入ると、ここに種目ごとの最高重量と差が並びます。'));return;}
   var ex=s.value, prefix=$('cmpScope').value==='month'?vy+'-'+pad(vm+1):null, est=$('cmpMetric').value==='rm';
   var rows=order().map(function(uid){return {uid:uid,b:best(uid,ex,prefix,est)};});
   var max=0; rows.forEach(function(r){if(r.b!==null&&r.b>max)max=r.b;});
@@ -587,8 +588,8 @@ function renderCompare(){
     }
     row.appendChild(v); box.appendChild(row);
   });
-  if(est)box.appendChild(el('p','note','推定1RM = 重量 ×（1 + 回数 ÷ 30）。回数が10回を超える記録では誤差が大きくなります。'));
-  if(myId&&mine===null)box.appendChild(el('p','note','自分がこの種目を記録すると、友達との差が表示されます。'));
+  if(est)box.appendChild(el('p','note hint','推定1RM = 重量 ×（1 + 回数 ÷ 30）。回数が10回を超える記録では誤差が大きくなります。'));
+  if(myId&&mine===null)box.appendChild(el('p','note hint','自分がこの種目を記録すると、友達との差が表示されます。'));
   var rm=myId?best(myId,ex,null,true):null, top=myId?best(myId,ex,null,false):null;
   if(rm!==null&&top>0){
     var goal=Math.floor(rm/10)*10+10, parts=[];
@@ -737,7 +738,7 @@ function preview(){
     var best=0; v.forEach(function(r){if(r.kg>0)best=Math.max(best,e1rm(r.kg,r.reps));});
     if(best>0)parts.push(b.ex+' 推定1RM 約 '+fmtKg(best)+' kg');
   });
-  $('fPrev').textContent=nSet?nEx+'種目・'+nSet+'セット分をまとめて記録します。'+(parts.length?'（'+parts.join(' ／ ')+'）':''):'種目ごとに、セットの重量と回数を入れてください。同じ内容のセットは「○セット」にまとめて保存します。';
+  $('fPrev').textContent=nSet?nEx+'種目・'+nSet+'セット分をまとめて記録します。'+(parts.length?'（'+parts.join(' ／ ')+'）':''):'';
 }
 function renderBlocks(focusId){
   var box=$('blocks'); box.textContent='';
@@ -902,7 +903,7 @@ $('form').addEventListener('submit',function(ev){
     },500);
   }else{
     var last=0;
-    (function loop(t){ if(t-last>150){last=t;frame(t);} requestAnimationFrame(loop); })(0);
+    (function loop(t){ if(t-last>100){last=t;frame(t);} requestAnimationFrame(loop); })(0);
   }
 })();
 
