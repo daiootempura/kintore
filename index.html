@@ -33,9 +33,22 @@
   --accent:#f2f2f2; --accent-ink:#111111; --warn:#ff8a80; color-scheme:dark;
 }
 *{box-sizing:border-box}
-html,body{margin:0}
+html,body{margin:0;height:100%}
 body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.6}
-.wrap{max-width:1040px;margin:0 auto;padding:20px 16px 48px;display:flex;flex-direction:column;gap:16px}
+.wrap{height:100%;max-width:1040px;margin:0 auto;padding:14px 16px 0;display:flex;flex-direction:column;gap:10px;overflow-y:auto}
+/* 2ページを横に並べ、左右スワイプで切り替える。各ページの中は縦にスクロールする */
+#pager{flex:1 1 auto;min-height:0;display:flex;gap:16px;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;overscroll-behavior-x:contain;scrollbar-width:none}
+#pager::-webkit-scrollbar{display:none}
+.page{flex:0 0 100%;min-width:0;overflow-y:auto;scroll-snap-align:start;scroll-snap-stop:always;display:flex;flex-direction:column;gap:16px;padding-bottom:32px}
+#tabs{display:flex;align-self:center;border:1px solid var(--line);border-radius:999px;padding:2px;flex:none}
+#tabs button{border:none;background:none;border-radius:999px;padding:4px 20px;min-height:34px}
+#tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);font-weight:700}
+.block{display:flex;flex-direction:column;gap:6px;border:1px solid var(--line);border-radius:10px;padding:10px}
+.block .bhead{display:flex;gap:6px;align-items:center}
+.block .bhead select{flex:1 1 auto}
+.x{white-space:nowrap}
+.block .addSet{align-self:flex-start;min-height:32px;padding:2px 10px;font-size:13px}
+#blocks{display:flex;flex-direction:column;gap:10px}
 header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
 h1{font-size:22px;margin:0;font-weight:700;letter-spacing:.02em}
 h2{font-size:16px;margin:0;font-weight:700}
@@ -109,7 +122,7 @@ input[type="range"]{padding:0;border:none;background:none;min-height:28px;accent
 .tap:hover{opacity:.7}
 .card[hidden]{display:none}
 #noGroup{max-width:480px;width:100%;margin:0 auto}
-body.nogroup .main,body.nogroup #cmpCard,body.nogroup #legend,body.nogroup #openSetup,body.nogroup #inviteBtn{display:none}
+body.nogroup #pager,body.nogroup #tabs,body.nogroup #openSetup,body.nogroup #inviteBtn{display:none}
 .hbtns{display:flex;gap:8px;flex-wrap:wrap}
 #takeover{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line);padding-top:12px}
 #takeover[hidden]{display:none}
@@ -117,7 +130,7 @@ body.nogroup .main,body.nogroup #cmpCard,body.nogroup #legend,body.nogroup #open
 #takeover .list button{display:inline-flex;align-items:center;gap:6px}
 #setup{display:none;max-width:480px;width:100%;margin:0 auto}
 body.setup-open #setup{display:flex}
-body.setup-open .main,body.setup-open #cmpCard,body.setup-open #legend,body.setup-open #openSetup{display:none}
+body.setup-open #pager,body.setup-open #tabs,body.setup-open #openSetup{display:none}
 .setupForm{display:flex;flex-direction:column;gap:12px;border-top:none;padding-top:0}
 .icons{display:flex;flex-wrap:wrap;gap:6px}
 .icons button{width:40px;height:40px;border-radius:50%;border:1px solid var(--line);background:var(--surface);font-size:20px;line-height:1;padding:0}
@@ -162,9 +175,7 @@ input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
   <header>
     <div>
       <h1>MuscleTempura</h1>
-      <p class="note">日付を選んで種目と重量を記録すると、友達の記録と並べて差を確認できます。</p>
     </div>
-    <div class="legend" id="legend" aria-label="メンバーと今月のトレーニング日数"></div>
     <div class="hbtns">
       <button class="btn" id="inviteBtn" type="button" hidden>招待リンクをコピー</button>
       <button class="btn" id="openSetup" type="button" hidden>設定</button>
@@ -214,6 +225,13 @@ input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
     <p class="note" id="homeHint">ホーム画面に追加して使う場合は、先に追加してから、そのアイコンで開いて設定してください（ブラウザとホーム画面のアプリは別の人として扱われます）。</p>
   </section>
 
+  <div id="tabs" role="tablist" aria-label="ページ切り替え">
+    <button type="button" role="tab" id="tab1" aria-selected="true" aria-controls="page1">記録</button>
+    <button type="button" role="tab" id="tab2" aria-selected="false" aria-controls="page2">比較</button>
+  </div>
+
+  <div id="pager">
+  <div class="page" id="page1" role="tabpanel" aria-labelledby="tab1">
   <div class="main">
     <section class="card" aria-label="カレンダー">
       <div class="calhead">
@@ -232,11 +250,10 @@ input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
       <h2 id="dayTitle"></h2>
       <div id="dayList"></div>
       <form id="form" autocomplete="off">
-        <label class="full" for="fEx">種目
-          <select id="fEx" required></select>
-        </label>
+        <div class="full" id="blocks"></div>
+        <button class="btn full" id="addBlock" type="button">＋ 別の種目も入力する</button>
         <div class="full exTools">
-          <button class="btn" id="exToggle" type="button" aria-expanded="false" aria-controls="exPanel">種目を追加・整理</button>
+          <button class="btn" id="exToggle" type="button" aria-expanded="false" aria-controls="exPanel">種目名を追加・整理</button>
           <div id="exPanel" hidden>
             <div class="exAdd">
               <label for="newEx">新しい種目の名前
@@ -247,14 +264,18 @@ input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
             <div class="exMine" id="exMine"></div>
           </div>
         </div>
-        <div class="full" id="setRows" role="group" aria-label="セットごとの重量と回数"></div>
-        <button class="btn full" id="addSet" type="button">＋ セットを追加（前のセットと同じ内容）</button>
         <p class="note full" id="fPrev" aria-live="polite"></p>
-        <button class="btn primary full" id="addBtn" type="submit">この日に記録する</button>
+        <button class="btn primary full" id="addBtn" type="submit">この日にまとめて記録する</button>
       </form>
     </section>
   </div>
 
+  </div>
+  <div class="page" id="page2" role="tabpanel" aria-labelledby="tab2">
+  <section class="card" aria-label="メンバー">
+    <h2>メンバーと今月のトレーニング日数</h2>
+    <div class="legend" id="legend"></div>
+  </section>
   <section class="card" id="cmpCard" aria-label="友達との差">
     <div class="cmphead">
       <h2>友達との差</h2>
@@ -273,6 +294,8 @@ input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
     <div class="bars" id="bars"></div>
   </section>
 
+  </div>
+  </div>
 </div>
 
 <script type="module">
@@ -446,15 +469,20 @@ function renderDay(){
   });
   renderExercises();
 }
+function exOptions(){ // 自分で追加した種目 → 基本の種目 → みんなが記録した種目
+  var seen={}, out=[];
+  myEx().concat(BASE_EX,allExercises()).forEach(function(x){if(!seen[x]){seen[x]=1;out.push(x);}});
+  return out;
+}
+function fillSelect(s,cur){
+  var opts=exOptions(); s.textContent='';
+  opts.forEach(function(x){var o=document.createElement('option');o.value=x;o.textContent=x;s.appendChild(o);});
+  if(cur&&opts.indexOf(cur)>=0)s.value=cur;
+  return s.value;
+}
 function myEx(){return (myId&&members[myId]&&members[myId].ex)||[];}
 function renderExercises(){ // 種目の選択肢: 自分で追加した種目 → 基本の種目 → みんなが記録した種目
-  var s=$('fEx'), cur=s.value, seen={};
-  s.textContent='';
-  myEx().concat(BASE_EX,allExercises()).forEach(function(x){
-    if(seen[x])return; seen[x]=1;
-    var o=document.createElement('option'); o.value=x; o.textContent=x; s.appendChild(o);
-  });
-  if(seen[cur])s.value=cur;
+  (typeof blocks==='undefined'?[]:blocks||[]).forEach(function(b,i){var s=$('ex'+i);if(s)b.ex=fillSelect(s,b.ex);});
   var box=$('exMine'); box.textContent='';
   if(!myEx().length)box.appendChild(el('span','note','自分で追加した種目はまだありません。'));
   myEx().forEach(function(x){
@@ -475,7 +503,7 @@ function addExercise(){
     if(m.ex.length>=60){banner('自分の種目は60個までです。使わない種目を削除してから追加してください。',true);return;}
     m.ex.push(x);
   }
-  $('newEx').value=''; render(); $('fEx').value=x; saveMine();
+  $('newEx').value=''; render(); blocks[blocks.length-1].ex=x; renderBlocks(); saveMine();
 }
 function renderCompare(){
   var s=$('cmpEx'), cur=s.value, exs=allExercises();
@@ -531,8 +559,8 @@ function render(){renderTally();renderLegend();renderCalendar();renderDay();rend
 function banner(text,warn){var b=$('banner');if(!text){b.hidden=true;return;}b.hidden=false;b.textContent=text;b.className='banner'+(warn?' warn':'');}
 function lock(){
   readOnly=true;
-  ['fEx','addBtn','addSet','newEx','newExBtn'].forEach(function(id){$(id).disabled=true;});
-  renderRows();
+  ['addBtn','addBlock','newEx','newExBtn'].forEach(function(id){$(id).disabled=true;});
+  renderBlocks();
   $('openSetup').hidden=true; closeSetup();
 }
 
@@ -581,60 +609,108 @@ $('exToggle').addEventListener('click',function(){
 });
 $('newExBtn').addEventListener('click',addExercise);
 $('newEx').addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();addExercise();}});
-/* セットをまとめて入力する行 */
-var rows=[{kg:'',reps:'10'}];
-function validRows(){
-  return rows.map(function(r){return {kg:num(r.kg),reps:Math.round(num(r.reps)),ok:r.kg!==''&&num(r.kg)>=0&&num(r.kg)<=999&&Math.round(num(r.reps))>=1&&Math.round(num(r.reps))<=999};})
+/* 複数の種目・複数のセットをまとめて入力する */
+var blocks=[{ex:'',rows:[{kg:'',reps:'10'}]}];
+function validRows(b){
+  return b.rows.map(function(r){var kg=num(r.kg),rp=Math.round(num(r.reps));return {kg:kg,reps:rp,ok:r.kg!==''&&kg>=0&&kg<=999&&rp>=1&&rp<=999};})
     .filter(function(r){return r.ok;});
 }
 function preview(){
-  var v=validRows(), best=0;
-  v.forEach(function(r){if(r.kg>0)best=Math.max(best,e1rm(r.kg,r.reps));});
-  $('fPrev').textContent=best>0?'この記録の推定1RM: 約 '+fmtKg(best)+' kg（1回だけ上げられる重さの目安・'+v.length+'セット分を記録します）':'セットごとに重量と回数を入れると、まとめて記録できます。同じ内容のセットは「○セット」にまとめて保存します。';
-}
-function renderRows(focusLast){
-  var box=$('setRows'); box.textContent='';
-  rows.forEach(function(r,i){
-    var row=el('div','setRow');
-    row.appendChild(el('span','no',String(i+1)));
-    var kg=document.createElement('input'); kg.type='number'; kg.inputMode='decimal'; kg.min='0'; kg.max='999'; kg.step='0.5';
-    kg.id='kg'+i; kg.value=r.kg; kg.placeholder='重量'; kg.setAttribute('aria-label',(i+1)+'セット目の重量（kg）'); kg.disabled=readOnly;
-    kg.addEventListener('input',function(){r.kg=kg.value;preview();});
-    var rp=document.createElement('input'); rp.type='number'; rp.inputMode='numeric'; rp.min='1'; rp.max='999'; rp.step='1';
-    rp.id='reps'+i; rp.value=r.reps; rp.placeholder='回数'; rp.setAttribute('aria-label',(i+1)+'セット目の回数'); rp.disabled=readOnly;
-    rp.addEventListener('input',function(){r.reps=rp.value;preview();});
-    row.appendChild(kg); row.appendChild(el('span','u','kg ×')); row.appendChild(rp); row.appendChild(el('span','u','回'));
-    var x=el('button','x','削除'); x.type='button'; x.setAttribute('aria-label',(i+1)+'セット目を削除');
-    x.disabled=readOnly||rows.length<2; x.style.visibility=rows.length<2?'hidden':'visible';
-    x.addEventListener('click',function(){rows.splice(i,1);renderRows();preview();});
-    row.appendChild(x);
-    box.appendChild(row);
+  var nEx=0, nSet=0, parts=[];
+  blocks.forEach(function(b){
+    var v=validRows(b); if(!v.length)return;
+    nEx++; nSet+=v.length;
+    var best=0; v.forEach(function(r){if(r.kg>0)best=Math.max(best,e1rm(r.kg,r.reps));});
+    if(best>0)parts.push(b.ex+' 推定1RM 約 '+fmtKg(best)+' kg');
   });
-  if(focusLast){var last=$('kg'+(rows.length-1));if(last){last.focus();last.select();}}
+  $('fPrev').textContent=nSet?nEx+'種目・'+nSet+'セット分をまとめて記録します。'+(parts.length?'（'+parts.join(' ／ ')+'）':''):'種目ごとに、セットの重量と回数を入れてください。同じ内容のセットは「○セット」にまとめて保存します。';
 }
-$('addSet').addEventListener('click',function(){
+function renderBlocks(focusId){
+  var box=$('blocks'); box.textContent='';
+  blocks.forEach(function(b,bi){
+    var blk=el('div','block'), head=el('div','bhead');
+    var s=document.createElement('select'); s.id='ex'+bi; s.setAttribute('aria-label',(bi+1)+'つ目の種目'); s.disabled=readOnly;
+    b.ex=fillSelect(s,b.ex);
+    s.addEventListener('change',function(){b.ex=s.value;preview();});
+    head.appendChild(s);
+    if(blocks.length>1){
+      var xb=el('button','x','外す'); xb.type='button'; xb.disabled=readOnly; xb.setAttribute('aria-label',(bi+1)+'つ目の種目を入力から外す');
+      xb.addEventListener('click',function(){blocks.splice(bi,1);renderBlocks();preview();});
+      head.appendChild(xb);
+    }
+    blk.appendChild(head);
+    b.rows.forEach(function(r,i){
+      var row=el('div','setRow');
+      row.appendChild(el('span','no',String(i+1)));
+      var kg=document.createElement('input'); kg.type='number'; kg.inputMode='decimal'; kg.min='0'; kg.max='999'; kg.step='0.5';
+      kg.id='kg'+bi+'_'+i; kg.value=r.kg; kg.placeholder='重量'; kg.setAttribute('aria-label',(bi+1)+'つ目の種目 '+(i+1)+'セット目の重量（kg）'); kg.disabled=readOnly;
+      kg.addEventListener('input',function(){r.kg=kg.value;preview();});
+      var rp=document.createElement('input'); rp.type='number'; rp.inputMode='numeric'; rp.min='1'; rp.max='999'; rp.step='1';
+      rp.id='reps'+bi+'_'+i; rp.value=r.reps; rp.placeholder='回数'; rp.setAttribute('aria-label',(bi+1)+'つ目の種目 '+(i+1)+'セット目の回数'); rp.disabled=readOnly;
+      rp.addEventListener('input',function(){r.reps=rp.value;preview();});
+      row.appendChild(kg); row.appendChild(el('span','u','kg ×')); row.appendChild(rp); row.appendChild(el('span','u','回'));
+      var x=el('button','x','削除'); x.type='button'; x.setAttribute('aria-label',(i+1)+'セット目を削除');
+      x.disabled=readOnly||b.rows.length<2; x.style.visibility=b.rows.length<2?'hidden':'visible';
+      x.addEventListener('click',function(){b.rows.splice(i,1);renderBlocks();preview();});
+      row.appendChild(x);
+      blk.appendChild(row);
+    });
+    var add=el('button','btn addSet','＋ セットを追加'); add.type='button'; add.disabled=readOnly;
+    add.setAttribute('aria-label',(bi+1)+'つ目の種目にセットを追加（前のセットと同じ内容）');
+    add.addEventListener('click',function(){
+      if(b.rows.length>=20){banner('1種目に入力できるのは20セットまでです。',true);return;}
+      var p=b.rows[b.rows.length-1]; b.rows.push({kg:p.kg,reps:p.reps});
+      renderBlocks('kg'+bi+'_'+(b.rows.length-1)); preview();
+    });
+    blk.appendChild(add);
+    box.appendChild(blk);
+  });
+  if(focusId){var f=$(focusId);if(f){f.focus();if(f.select)f.select();}}
+}
+$('addBlock').addEventListener('click',function(){
   if(readOnly)return;
-  if(rows.length>=20){banner('一度に入力できるのは20セットまでです。',true);return;}
-  var p=rows[rows.length-1]; rows.push({kg:p.kg,reps:p.reps}); renderRows(true); preview();
+  if(blocks.length>=10){banner('一度に入力できるのは10種目までです。',true);return;}
+  var used={}; blocks.forEach(function(b){used[b.ex]=1;});
+  var next=exOptions().filter(function(x){return !used[x];})[0]||'';
+  blocks.push({ex:next,rows:[{kg:'',reps:'10'}]});
+  renderBlocks('ex'+(blocks.length-1)); preview();
 });
-renderRows(); preview();
+renderBlocks(); preview();
 $('form').addEventListener('submit',function(ev){
   ev.preventDefault(); if(readOnly||!myId)return;
-  var ex=$('fEx').value.trim().slice(0,40), v=validRows();
-  if(!ex)return;
-  if(!v.length){var f=$('kg0');if(f)f.focus();return;}
-  // 同じ重量・回数のセットは1つの記録にまとめ、セット数として保存する
-  var groups=[], idx={};
-  v.forEach(function(r){var k=r.kg+'|'+r.reps;if(idx[k]===undefined){idx[k]=groups.length;groups.push({kg:r.kg,reps:r.reps,sets:1});}else groups[idx[k]].sets++;});
-  var m=mine(); if(!m.d[sel])m.d[sel]={};
-  var now=Date.now();
-  groups.forEach(function(g,i){
-    var id='e'+(now+i).toString(36)+Math.random().toString(36).slice(2,6);
-    m.d[sel][id]={ex:ex,kg:g.kg,reps:g.reps,sets:g.sets,t:now+i};
+  var m=mine(), now=Date.now(), n=0, firstEx='';
+  blocks.forEach(function(b){
+    var ex=(b.ex||'').trim().slice(0,40), v=validRows(b);
+    if(!ex||!v.length)return;
+    // 同じ重量・回数のセットは1つの記録にまとめ、セット数として保存する
+    var groups=[], idx={};
+    v.forEach(function(r){var k=r.kg+'|'+r.reps;if(idx[k]===undefined){idx[k]=groups.length;groups.push({kg:r.kg,reps:r.reps,sets:1});}else groups[idx[k]].sets++;});
+    if(!m.d[sel])m.d[sel]={};
+    groups.forEach(function(g){
+      var id='e'+(now+n).toString(36)+Math.random().toString(36).slice(2,6);
+      m.d[sel][id]={ex:ex,kg:g.kg,reps:g.reps,sets:g.sets,t:now+n}; n++;
+    });
+    if(!firstEx)firstEx=ex;
   });
-  rows=[{kg:'',reps:rows[rows.length-1].reps||'10'}]; renderRows(); preview();
-  render(); $('cmpEx').value=ex; renderCompare(); saveMine();
+  if(!n){var f=$('kg0_0');if(f)f.focus();return;}
+  blocks=[{ex:blocks[blocks.length-1].ex,rows:[{kg:'',reps:'10'}]}];
+  render(); renderBlocks(); preview(); $('cmpEx').value=firstEx; renderCompare(); saveMine();
 });
+
+/* ---------- ページ切り替え（タブと左右スワイプ） ---------- */
+(function(){
+  var pager=$('pager'), tabs=[$('tab1'),$('tab2')], pages=[$('page1'),$('page2')];
+  function setTab(i){tabs.forEach(function(t,k){t.setAttribute('aria-selected',k===i?'true':'false');});}
+  function go(i){
+    var smooth=!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    pager.scrollTo({left:pages[i].offsetLeft-pages[0].offsetLeft,behavior:smooth?'smooth':'auto'});
+  }
+  tabs.forEach(function(t,i){t.addEventListener('click',function(){go(i);});});
+  pager.addEventListener('scroll',function(){
+    var w=pages[1].offsetLeft-pages[0].offsetLeft||1;
+    setTab(pager.scrollLeft>w/2?1:0);
+  },{passive:true});
+})();
 
 /* ---------- 初期設定（アイコンと名前） ---------- */
 var pendingPhoto='';
