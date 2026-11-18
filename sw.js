@@ -1,5 +1,5 @@
 // 通信できるときは必ず最新を取りに行き、できないときは前回の控えで画面だけ開けるようにする
-const CACHE = 'kintore-v31';
+const CACHE = 'kintore-v32';
 self.addEventListener('install', e => self.skipWaiting());
 self.addEventListener('activate', e => e.waitUntil(
   caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())

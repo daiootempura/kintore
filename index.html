@@ -57,6 +57,11 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15p
 .aw canvas{position:absolute;left:50%;top:50%;width:320%;height:320%;transform:translate(-50%,-50%);pointer-events:none;z-index:1}
 .aw.sm .av{border-color:var(--aura);box-shadow:0 0 0 1.5px var(--aura)}
 .hint{display:none!important}
+.pmsg{margin:0 0 0 34px;font-size:13px;overflow-wrap:anywhere;border-left:2px solid var(--line);padding-left:8px}
+.pmsgIn{margin-left:34px;width:calc(100% - 34px);min-height:34px;font-size:13px}
+.notice p{margin:0;font-size:13px}
+.notice .acts{justify-content:flex-end}
+.notice .btn{min-height:32px;padding:2px 12px;font-size:13px}
 .phd{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .phd .pname{min-width:0}
 .ptog{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:none;border-radius:999px;padding:2px 6px 2px 12px;min-height:30px;font-size:12px;color:var(--muted);flex:none}
@@ -357,6 +362,10 @@ input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
       <button class="btn" id="openSetup" type="button" hidden>設定</button>
     </div>
   </header>
+  <section class="card notice" id="mergeNote" hidden aria-label="お知らせ">
+    <p><b>お知らせ</b>　アカウントが二つ以上できてしまうことがあります。自分のアカウントが複数あるときは、プロフィールの「アカウントの統合」から一つにまとめてください。</p>
+    <div class="acts"><button class="btn primary" id="mergeGo" type="button">統合する</button><button class="btn" id="mergeHide" type="button">閉じる</button></div>
+  </section>
   <div class="main">
     <section class="card" aria-label="カレンダー">
       <div class="calhead">
@@ -471,7 +480,7 @@ input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
     </div>
   </div>
 </div>
-<p class="note" id="ver" style="text-align:center;flex:none;margin:0 0 4px">版 31</p>
+<p class="note" id="ver" style="text-align:center;flex:none;margin:0 0 4px">版 32</p>
 </div>
 
 <script type="module">
@@ -527,6 +536,7 @@ function clean(raw){ // 共有データは信用せず、形を整えてから�
   if(typeof raw.nick==='string')out.nick=raw.nick.slice(0,20);
   if(typeof raw.goal==='string')out.goal=raw.goal.trim().slice(0,60);
   out.u=num(raw.u);
+  out.msg={}; if(raw.msg&&typeof raw.msg==='object')Object.keys(raw.msg).slice(-400).forEach(function(k){var t=raw.msg[k];if(/^\d{4}-\d{2}-\d{2}$/.test(k)&&typeof t==='string'&&t.trim())out.msg[k]=t.trim().slice(0,60);});
   out.cat={}; if(raw.cat&&typeof raw.cat==='object')Object.keys(raw.cat).slice(0,80).forEach(function(k){var n=k.trim().slice(0,40),p=raw.cat[k];if(n&&PARTS.indexOf(p)>=0&&p!=='有酸素')out.cat[n]=p;});
   out.cex=[]; if(Array.isArray(raw.cex))raw.cex.slice(0,60).forEach(function(x){if(typeof x==='string'){x=x.trim().slice(0,40);if(x&&out.cex.indexOf(x)<0)out.cex.push(x);}});
   if(raw.aura===true)out.aura=true;       // 稲妻は、達成時の提案で「付ける」を選んだ人だけ
@@ -771,13 +781,22 @@ function renderCalendar(){
     b.appendChild(dots);
     b.setAttribute('aria-label',(vm+1)+'月'+d+'日'+(who.length?'、記録あり: '+who.join('、'):''));
     if(k===sel)b.setAttribute('aria-pressed','true');
-    b.addEventListener('click',function(){sel=k;render();});
+    b.addEventListener('click',function(){if(msgDraft!==null){saveMsg(msgDraftDate,msgDraft);msgDraft=null;}sel=k;render();});
     g.appendChild(b);
   })(d);}
   renderCalZap();
 }
 var dayOpen={};  // その日の記録を開いている人
+var msgDraft=null, msgDraftDate='';  // 入力途中のひとこと（友達の更新で画面が描き直されても消えないように）
+function saveMsg(date,text){
+  if(readOnly||!myId)return;
+  var m=mine(), t=(text||'').trim().slice(0,60), cur=m.msg[date]||'';
+  if(t===cur)return;
+  if(t)m.msg[date]=t; else delete m.msg[date];
+  saveMine();
+}
 function renderDay(){
+  var hadFocus=document.activeElement&&document.activeElement.id==='msgIn';
   var p=sel.split('-'), dt=new Date(+p[0],+p[1]-1,+p[2]);
   $('dayTitle').textContent=(+p[1])+'月'+(+p[2])+'日（'+DOW[dt.getDay()]+'）の記録';
   var list=$('dayList'); list.textContent='';
@@ -804,6 +823,18 @@ function renderDay(){
       hd.appendChild(tg);
     }else hd.appendChild(el('span','note','記録なし'));
     box.appendChild(hd);
+    var said=(members[uid].msg||{})[sel]||'';
+    if(uid===myId&&!readOnly&&!sample&&gid){ // 自分: その日のひとことを書く
+      var mi=document.createElement('input'); mi.id='msgIn'; mi.className='pmsgIn'; mi.maxLength=60; mi.enterKeyHint='done';
+      mi.placeholder='この日のひとこと（友達にも表示されます）'; mi.setAttribute('aria-label',(+p[1])+'月'+(+p[2])+'日のひとこと');
+      mi.value=(msgDraft!==null&&msgDraftDate===sel)?msgDraft:said;
+      mi.addEventListener('input',function(){msgDraft=mi.value;msgDraftDate=sel;});
+      mi.addEventListener('change',function(){saveMsg(sel,mi.value);msgDraft=null;});
+      mi.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();mi.blur();}});
+      box.appendChild(mi);
+    }else if(said){ // 友達: ひとことを表示（記録を畳んでいても見える）
+      box.appendChild(el('p','pmsg',said));
+    }
     if(open&&es.length){
       groups.forEach(function(g){
         var line=el('div','exline'), sets=el('div','sets'), rm=0;
@@ -829,6 +860,7 @@ function renderDay(){
     list.appendChild(box);
   });
   if(none.length)list.appendChild(el('p','note nonote','記録なし: '+none.join('、')));
+  if(hadFocus){var f=$('msgIn');if(f){f.focus();var L=f.value.length;try{f.setSelectionRange(L,L);}catch(e){}}}
   renderExercises();
 }
 function exOptions(){ // 自分で追加した種目・基本の種目・みんなが記録した種目を、名前の順に
@@ -1040,7 +1072,17 @@ function refreshCardio(){ // 基本の有酸素種目＋誰かが有酸素とし
   cardioSet=set; catMap=cats;
 }
 function isCardio(ex){return !!cardioSet[ex];}
-function render(){refreshCardio();renderAdmin();renderTally();renderLegend();renderCalendar();renderDay();renderCompare();}
+function renderNote(){
+  var show=!!(myId&&gid&&!readOnly&&!sample&&members[myId]&&members[myId].nick&&load('mt_note_merge')!=='1'&&
+    Object.keys(members).some(function(id){return id!==myId&&members[id].nick;}));
+  $('mergeNote').hidden=!show;
+}
+$('mergeHide').addEventListener('click',function(){store('mt_note_merge','1');renderNote();});
+$('mergeGo').addEventListener('click',function(){
+  openSetup(false);
+  var t=$('takeover'); if(t&&!t.hidden)t.scrollIntoView({block:'start'});
+});
+function render(){refreshCardio();renderNote();renderAdmin();renderTally();renderLegend();renderCalendar();renderDay();renderCompare();}
 
 function banner(text,warn){var b=$('banner');if(!text){b.hidden=true;return;}b.hidden=false;b.textContent=text;b.className='banner'+(warn?' warn':'');}
 function lock(){
@@ -1069,7 +1111,7 @@ function saveMine(){
     }
   });
 }
-function mine(){if(!members[myId])members[myId]={nick:'',photo:'',goal:'',u:0,rep:{},ex:[],d:{}};if(!members[myId].ex)members[myId].ex=[];if(!members[myId].cex)members[myId].cex=[];if(!members[myId].cat)members[myId].cat={};return members[myId];}
+function mine(){if(!members[myId])members[myId]={nick:'',photo:'',goal:'',u:0,rep:{},ex:[],d:{}};if(!members[myId].ex)members[myId].ex=[];if(!members[myId].cex)members[myId].cex=[];if(!members[myId].cat)members[myId].cat={};if(!members[myId].msg)members[myId].msg={};return members[myId];}
 function addEntry(date,ex,kg,reps,sets){
   var m=mine(); if(!m.d[date])m.d[date]={};
   var id='e'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
@@ -1391,6 +1433,7 @@ function mergeFrom(old){ // 別のアカウントの記録を自分に合わせ�
   (o.ex||[]).forEach(function(x){if(m.ex.indexOf(x)<0&&m.ex.length<60)m.ex.push(x);});
   (o.cex||[]).forEach(function(x){if(m.cex.indexOf(x)<0)m.cex.push(x);});
   Object.keys(o.cat||{}).forEach(function(k){if(!m.cat[k])m.cat[k]=o.cat[k];});
+  Object.keys(o.msg||{}).forEach(function(k){if(!m.msg[k])m.msg[k]=o.msg[k];});
   if(!m.photo)m.photo=o.photo; if(!m.goal)m.goal=o.goal;
   m.aura=m.aura===true||o.aura===true; m.crown=m.crown===true||o.crown===true; m.seen=Math.max(m.seen||0,o.seen||0);
   if(!m.rep)m.rep={};
@@ -1403,7 +1446,7 @@ function mergeFrom(old){ // 別のアカウントの記録を自分に合わせ�
 function takeOver(old){ // 以前の自分の記録を写し、古い方は一覧から隠す
   var o=members[old]; if(!o||readOnly||!myId)return;
   var m=mine();
-  m.nick=o.nick; m.photo=o.photo; m.goal=o.goal; m.aura=o.aura===true; m.crown=o.crown===true; m.seen=o.seen||0; m.ex=(o.ex||[]).slice(); m.cex=(o.cex||[]).slice(); m.cat=JSON.parse(JSON.stringify(o.cat||{})); m.d=JSON.parse(JSON.stringify(o.d));
+  m.nick=o.nick; m.photo=o.photo; m.goal=o.goal; m.aura=o.aura===true; m.crown=o.crown===true; m.seen=o.seen||0; m.ex=(o.ex||[]).slice(); m.cex=(o.cex||[]).slice(); m.cat=JSON.parse(JSON.stringify(o.cat||{})); m.msg=JSON.parse(JSON.stringify(o.msg||{})); m.d=JSON.parse(JSON.stringify(o.d));
   m.rep=JSON.parse(JSON.stringify(o.rep||{})); m.rep[old]=Date.now();
   delete members[old];
   closeSetup(); render(); saveMine();
