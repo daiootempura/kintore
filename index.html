@@ -118,7 +118,15 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15p
 .prow .diff{color:var(--ink)}
 #ach .card{max-width:340px;width:100%;align-items:center;text-align:center;gap:14px;padding:26px 18px 18px}
 #ach p{margin:0;font-size:14px}
-#achPrev{padding:22px 0 10px}
+#achPrev{padding:20px 0 8px}
+#achKicker{font-size:12px!important;color:var(--muted);letter-spacing:.1em}
+#achBig{font-family:var(--display);font-size:56px!important;font-weight:700;line-height:1;color:var(--achc,var(--ink));text-shadow:0 0 18px var(--achc,transparent);font-variant-numeric:tabular-nums}
+#achBig small{font-size:24px;margin-left:4px}
+#ach h2{font-size:18px}
+#ach h2 span{display:inline-block}
+#ach .card{animation:achPop .35s ease-out}
+@keyframes achPop{0%{transform:scale(.85);opacity:0}100%{transform:scale(1);opacity:1}}
+@media (prefers-reduced-motion: reduce){#ach .card{animation:none}}
 #achPrev .av{width:64px;height:64px;font-size:28px}
 #ach .acts{justify-content:center}
 /* 題名とボタンは「記録」ページの中に置き、スクロールで一緒に流れる。題名だけは初期設定などの画面用に別に持つ */
@@ -471,8 +479,10 @@ input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
 </div>
 <div id="ach" hidden role="dialog" aria-modal="true" aria-labelledby="achTitle">
   <div class="card">
-    <div id="achPrev"></div>
+    <p id="achKicker">ベンチプレス</p>
+    <p id="achBig"></p>
     <h2 id="achTitle"></h2>
+    <div id="achPrev"></div>
     <p id="achText"></p>
     <div class="acts">
       <button class="btn primary" id="achYes" type="button">付ける</button>
@@ -480,7 +490,7 @@ input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
     </div>
   </div>
 </div>
-<p class="note" id="ver" style="text-align:center;flex:none;margin:0 0 4px">版 32</p>
+<p class="note" id="ver" style="text-align:center;flex:none;margin:0 0 4px">版 33</p>
 </div>
 
 <script type="module">
@@ -587,7 +597,8 @@ function avatar(uid,small,force){ // 選んだ写真。未設定なら名前の�
   return w;
 }
 /* ---------- 達成した瞬間に、稲妻や王冠を付けるか提案する ---------- */
-var LV=[null,{kg:60,name:'緑'},{kg:70,name:'青'},{kg:80,name:'赤'},{kg:90,name:'金'}], achQ=[];
+var LV=[null,{kg:60,name:'緑',col:'#1faa4b'},{kg:70,name:'青',col:'#1f7ae0'},{kg:80,name:'赤',col:'#e02b2b'},{kg:90,name:'金',col:'#f2b705'},{kg:100,name:'金',col:'#f2b705'}], achQ=[];
+var CONGRATS={1:'60kgの大台、おめでとうございます！',2:'70kgの大台、おめでとうございます！',3:'80kgの大台、おめでとうございます！',4:'90kgの大台、おめでとうございます！',5:'ついに100kgの大台、おめでとうございます！'};
 function checkAchieve(){
   if(sample||readOnly||!myId||!gid||!members[myId]||!members[myId].nick)return;
   if(!$('ach').hidden||document.body.classList.contains('setup-open'))return;
@@ -596,19 +607,23 @@ function checkAchieve(){
   achQ=[];
   if(Math.min(lv,4)>Math.min(seen,4))achQ.push('aura');
   if(lv>=5&&seen<5)achQ.push('crown');
-  achQ.lv=lv; nextAch();
+  achQ.lv=lv; achQ.first=true; nextAch();
 }
-function nextAch(){
-  var m=mine(), lv=achQ.lv;
+function nextAch(){ // 大台のお祝いを出し、稲妻（100kgでは王冠も）を付けるか尋ねる
+  var m=mine(), lv=achQ.lv, L=LV[lv];
   if(!achQ.length){ $('ach').hidden=true; m.seen=lv; render(); saveMine(); return; }
   var kind=achQ[0], pv=$('achPrev'); pv.textContent='';
+  $('ach').style.setProperty('--achc',L.col);
+  $('achBig').textContent=String(L.kg); $('achBig').appendChild(el('small',null,'kg'));
+  // お祝いの言葉は最初の1枚だけ。100kgで続けて王冠を尋ねるときは、王冠の案内にする
+  var t=$('achTitle'); t.textContent='';
+  (achQ.first?CONGRATS[lv]:'100kg達成の王冠です').split('、').forEach(function(x,i,a){t.appendChild(el('span',null,x+(i<a.length-1?'、':'')));}); // 「、」で行を分け、言葉の途中で折れないようにする
+  achQ.first=false;
   if(kind==='aura'){
-    var L=LV[Math.min(lv,4)];
-    $('achTitle').textContent='ベンチプレス '+L.kg+' kg 達成';
-    $('achText').textContent=L.name+'の稲妻をアイコンに付けますか？';
+    var A=LV[Math.min(lv,4)];
+    $('achText').textContent=m.aura===true?'アイコンの稲妻を'+A.name+'にパワーアップしますか？':A.name+'の稲妻をアイコンに付けますか？';
     pv.appendChild(avatar(myId,false,{aura:true,crown:m.crown===true}));
   }else{
-    $('achTitle').textContent='ベンチプレス 100 kg 達成';
     $('achText').textContent='王冠をアイコンに付けますか？';
     pv.appendChild(avatar(myId,false,{aura:m.aura===true,crown:true}));
   }
