@@ -55,7 +55,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15p
 .aw .av{border-color:#fff;box-shadow:0 0 0 1.5px var(--aura),0 0 7px 2px var(--aura);transition:box-shadow .12s}
 .aw.surge .av{box-shadow:0 0 0 1px #fff,0 0 0 3px var(--aura),0 0 16px 6px var(--aura)}
 .aw canvas{position:absolute;left:50%;top:50%;width:320%;height:320%;transform:translate(-50%,-50%);pointer-events:none;z-index:1}
-.aw.sm .av{border-color:var(--aura);box-shadow:0 0 0 1.5px var(--aura)}
+.aw.sm .av,.aw.sm .av.mono{border-color:var(--aura);box-shadow:none}   /* カレンダーは細い縁だけ */
 .hint{display:none!important}
 .pmsg{margin:0 0 0 34px;font-size:13px;overflow-wrap:anywhere;border-left:2px solid var(--line);padding-left:8px}
 .pmsgIn{margin-left:34px;width:calc(100% - 34px);min-height:34px;font-size:13px}
@@ -119,6 +119,8 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15p
 #ach .card{max-width:340px;width:100%;align-items:center;text-align:center;gap:14px;padding:26px 18px 18px}
 #ach p{margin:0;font-size:14px}
 #achPrev{padding:20px 0 8px}
+#achNote{font-size:13px!important;font-weight:700}
+#achNote[hidden]{display:none}
 #achKicker{font-size:12px!important;color:var(--muted);letter-spacing:.1em}
 #achBig{font-family:var(--display);font-size:56px!important;font-weight:700;line-height:1;color:var(--achc,var(--ink));text-shadow:0 0 18px var(--achc,transparent);font-variant-numeric:tabular-nums}
 #achBig small{font-size:24px;margin-left:4px}
@@ -483,6 +485,7 @@ input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
     <p id="achBig"></p>
     <h2 id="achTitle"></h2>
     <div id="achPrev"></div>
+    <p id="achNote" hidden>これで、仲間の稲妻も見えるようになりました。</p>
     <p id="achText"></p>
     <div class="acts">
       <button class="btn primary" id="achYes" type="button">付ける</button>
@@ -490,7 +493,7 @@ input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
     </div>
   </div>
 </div>
-<p class="note" id="ver" style="text-align:center;flex:none;margin:0 0 4px">版 33</p>
+<p class="note" id="ver" style="text-align:center;flex:none;margin:0 0 4px">版 35</p>
 </div>
 
 <script type="module">
@@ -546,6 +549,7 @@ function clean(raw){ // 共有データは信用せず、形を整えてから�
   if(typeof raw.nick==='string')out.nick=raw.nick.slice(0,20);
   if(typeof raw.goal==='string')out.goal=raw.goal.trim().slice(0,60);
   out.u=num(raw.u);
+  out.cv=Math.max(0,Math.round(num(raw.cv)));
   out.msg={}; if(raw.msg&&typeof raw.msg==='object')Object.keys(raw.msg).slice(-400).forEach(function(k){var t=raw.msg[k];if(/^\d{4}-\d{2}-\d{2}$/.test(k)&&typeof t==='string'&&t.trim())out.msg[k]=t.trim().slice(0,60);});
   out.cat={}; if(raw.cat&&typeof raw.cat==='object')Object.keys(raw.cat).slice(0,80).forEach(function(k){var n=k.trim().slice(0,40),p=raw.cat[k];if(n&&PARTS.indexOf(p)>=0&&p!=='有酸素')out.cat[n]=p;});
   out.cex=[]; if(Array.isArray(raw.cex))raw.cex.slice(0,60).forEach(function(x){if(typeof x==='string'){x=x.trim().slice(0,40);if(x&&out.cex.indexOf(x)<0)out.cex.push(x);}});
@@ -585,6 +589,7 @@ function avatar(uid,small,force){ // 選んだ写真。未設定なら名前の�
   else{var n=(m.nick||names[uid]||'').trim();a.textContent=n?Array.from(n)[0]:'?';a.className+=' mono';}
   a.setAttribute('aria-hidden','true');
   var lv=benchLevel(uid), aura=force?!!force.aura:m.aura===true, crown=(force?!!force.crown:m.crown===true)&&lv>=5;
+  if(!force&&uid!==myId&&!canSeeAura())aura=false;   // 自分が60kgに届くまでは、他の人の稲妻は見えない
   if(!lv||(!aura&&!crown))return a;
   var w=el('span','aw '+(aura?'lv'+lv:'noaura')+(small?' sm':'')); w.setAttribute('aria-hidden','true');
   w.appendChild(a);
@@ -597,23 +602,31 @@ function avatar(uid,small,force){ // 選んだ写真。未設定なら名前の�
   return w;
 }
 /* ---------- 達成した瞬間に、稲妻や王冠を付けるか提案する ---------- */
+function canSeeAura(){ return !!(myId&&(benchLevel(myId)>=1||((members[myId]||{}).seen||0)>=1)); }
+var CV=1;   // お祝いの版。上げると、基準に届いている人全員にもう一度お祝いを出す
 var LV=[null,{kg:60,name:'緑',col:'#1faa4b'},{kg:70,name:'青',col:'#1f7ae0'},{kg:80,name:'赤',col:'#e02b2b'},{kg:90,name:'金',col:'#f2b705'},{kg:100,name:'金',col:'#f2b705'}], achQ=[];
 var CONGRATS={1:'60kgの大台、おめでとうございます！',2:'70kgの大台、おめでとうございます！',3:'80kgの大台、おめでとうございます！',4:'90kgの大台、おめでとうございます！',5:'ついに100kgの大台、おめでとうございます！'};
 function checkAchieve(){
   if(sample||readOnly||!myId||!gid||!members[myId]||!members[myId].nick)return;
   if(!$('ach').hidden||document.body.classList.contains('setup-open'))return;
-  var m=members[myId], lv=benchLevel(myId), seen=m.seen||0;
-  if(lv<=seen)return;
+  var m=members[myId], lv=benchLevel(myId), seen=m.seen||0, again=lv>=1&&(m.cv||0)<CV&&lv<=seen;
+  if(lv<=seen&&!again)return;
   achQ=[];
-  if(Math.min(lv,4)>Math.min(seen,4))achQ.push('aura');
-  if(lv>=5&&seen<5)achQ.push('crown');
-  achQ.lv=lv; achQ.first=true; nextAch();
+  if(again){ // 新しい版になったので、届いている段階をあらためてお祝いする
+    achQ.push('aura'); if(lv>=5)achQ.push('crown');
+  }else{
+    if(Math.min(lv,4)>Math.min(seen,4))achQ.push('aura');
+    if(lv>=5&&seen<5)achQ.push('crown');
+  }
+  achQ.lv=lv; achQ.first=true; achQ.again=again; achQ.unlock=seen<1&&!again; nextAch();
 }
 function nextAch(){ // 大台のお祝いを出し、稲妻（100kgでは王冠も）を付けるか尋ねる
   var m=mine(), lv=achQ.lv, L=LV[lv];
-  if(!achQ.length){ $('ach').hidden=true; m.seen=lv; render(); saveMine(); return; }
+  if(!achQ.length){ $('ach').hidden=true; m.seen=Math.max(m.seen||0,lv); m.cv=CV; render(); saveMine(); return; }
   var kind=achQ[0], pv=$('achPrev'); pv.textContent='';
   $('ach').style.setProperty('--achc',L.col);
+  $('achKicker').textContent=achQ.again?'新しい版になりました　ベンチプレス':'ベンチプレス';
+  $('achNote').hidden=!(achQ.unlock&&achQ.first);
   $('achBig').textContent=String(L.kg); $('achBig').appendChild(el('small',null,'kg'));
   // お祝いの言葉は最初の1枚だけ。100kgで続けて王冠を尋ねるときは、王冠の案内にする
   var t=$('achTitle'); t.textContent='';
@@ -621,7 +634,7 @@ function nextAch(){ // 大台のお祝いを出し、稲妻（100kgでは王冠�
   achQ.first=false;
   if(kind==='aura'){
     var A=LV[Math.min(lv,4)];
-    $('achText').textContent=m.aura===true?'アイコンの稲妻を'+A.name+'にパワーアップしますか？':A.name+'の稲妻をアイコンに付けますか？';
+    $('achText').textContent=m.aura===true?(achQ.again?A.name+'の稲妻を、このまま付けておきますか？':'アイコンの稲妻を'+A.name+'にパワーアップしますか？'):A.name+'の稲妻をアイコンに付けますか？';
     pv.appendChild(avatar(myId,false,{aura:true,crown:m.crown===true}));
   }else{
     $('achText').textContent='王冠をアイコンに付けますか？';
@@ -1329,17 +1342,49 @@ $('form').addEventListener('submit',function(ev){
       stroke(c,jag(p[0],p[1],p[0]+Math.cos(a)*L,p[1]+Math.sin(a)*L,.5,3),col,core,b.w*.6,u,b.a);
     }
   }
+  function makePaths(b){ // 1本の稲妻の形を決める（半径1の大きさで）
+    var main=jag(b.x1,b.y1,b.x2,b.y2,b.rough,4), P={main:main,w:b.w,a:b.a,br:null};
+    if(b.branch){
+      var p=main[Math.floor(main.length*b.branch.at)], dx=b.x2-b.x1, dy=b.y2-b.y1, L=Math.sqrt(dx*dx+dy*dy)*b.branch.len, a=Math.atan2(dy,dx)+b.branch.ang;
+      P.br=jag(p[0],p[1],p[0]+Math.cos(a)*L,p[1]+Math.sin(a)*L,.5,3);
+    }
+    return P;
+  }
+  function scaled(pts,R){return pts.map(function(q){return [q[0]*R,q[1]*R];});}
+  // カレンダーの小さいアイコンは、全員が同じ形・同じタイミングで光る
+  var smSt={bolts:[],next:0,end:0}, smPaths=null, smSurge=false;
+  function stepShared(now){
+    if(now>smSt.next){smSt.end=now+rnd(1100,1600);smSt.next=smSt.end+rnd(3600,6500);}
+    smSurge=now<smSt.end;
+    for(var k=smSt.bolts.length-1;k>=0;k--){if(--smSt.bolts[k].life<=0)smSt.bolts.splice(k,1);}
+    var want=smSurge?2:1;
+    while(smSt.bolts.length<want)smSt.bolts.push(newBolt(1,smSurge,1));
+    smPaths=(!smSurge&&Math.random()<.1)?null:smSt.bolts.map(makePaths);
+  }
   var tick=0;
   function frame(now){
     tick++;
+    var smTurn=tick%2===0; if(smTurn)stepShared(now);
     var list=document.querySelectorAll('.aw canvas'), vw=window.innerWidth, vh=window.innerHeight, dk=isDark(now);
     for(var i=0;i<list.length;i++){
       var cv=list[i], sm=!!cv.dataset.sm;
-      if(sm&&(tick+i)%2)continue;                                                   // カレンダーの小さいものは1回おきに描き直す
+      if(sm&&!smTurn)continue;                                                      // カレンダーの小さいものは1回おきに描き直す
       var wrap=cv.parentNode, box=wrap.getBoundingClientRect();
       if(!box.width||box.right<0||box.left>vw||box.bottom<0||box.top>vh)continue;   // 画面外は描かない
       var dpr=Math.min(window.devicePixelRatio||1,3), size=Math.round(box.width*3.2*dpr);
       if(cv.width!==size){cv.width=size;cv.height=size;}
+      if(sm){
+        if(smSurge!==cv.parentNode.classList.contains('surge'))wrap.classList.toggle('surge',smSurge);
+        var sc=cv.getContext('2d'); sc.setTransform(1,0,0,1,0,0); sc.clearRect(0,0,size,size);
+        if(!smPaths)continue;
+        var scol=getComputedStyle(wrap).getPropertyValue('--aura').trim()||'#1faa4b', score=dk?'#ffffff':scol, sR=box.width/2*dpr, su=dpr*.6;
+        sc.translate(size/2,size/2); sc.lineCap='round'; sc.lineJoin='round'; glow=false;
+        smPaths.forEach(function(P){
+          stroke(sc,scaled(P.main,sR),scol,score,P.w,su,P.a);
+          if(P.br)stroke(sc,scaled(P.br,sR),scol,score,P.w*.6,su,P.a);
+        });
+        sc.globalAlpha=1; continue;
+      }
       var st=state.get(cv); if(!st){st={bolts:[],next:now+rnd(600,2600),end:0};state.set(cv,st);}
       var lv=Math.min(+cv.dataset.lv||1,4), u=sm?dpr*.6:dpr, R=box.width/2*dpr;
       // ときどき激しくなる（レベルが高いほど頻繁に、長く）
@@ -1450,7 +1495,7 @@ function mergeFrom(old){ // 別のアカウントの記録を自分に合わせ�
   Object.keys(o.cat||{}).forEach(function(k){if(!m.cat[k])m.cat[k]=o.cat[k];});
   Object.keys(o.msg||{}).forEach(function(k){if(!m.msg[k])m.msg[k]=o.msg[k];});
   if(!m.photo)m.photo=o.photo; if(!m.goal)m.goal=o.goal;
-  m.aura=m.aura===true||o.aura===true; m.crown=m.crown===true||o.crown===true; m.seen=Math.max(m.seen||0,o.seen||0);
+  m.aura=m.aura===true||o.aura===true; m.crown=m.crown===true||o.crown===true; m.seen=Math.max(m.seen||0,o.seen||0); m.cv=Math.max(m.cv||0,o.cv||0);
   if(!m.rep)m.rep={};
   Object.keys(o.rep||{}).forEach(function(k){if(k!==myId)m.rep[k]=o.rep[k];});
   m.rep[old]=Date.now();
@@ -1461,7 +1506,7 @@ function mergeFrom(old){ // 別のアカウントの記録を自分に合わせ�
 function takeOver(old){ // 以前の自分の記録を写し、古い方は一覧から隠す
   var o=members[old]; if(!o||readOnly||!myId)return;
   var m=mine();
-  m.nick=o.nick; m.photo=o.photo; m.goal=o.goal; m.aura=o.aura===true; m.crown=o.crown===true; m.seen=o.seen||0; m.ex=(o.ex||[]).slice(); m.cex=(o.cex||[]).slice(); m.cat=JSON.parse(JSON.stringify(o.cat||{})); m.msg=JSON.parse(JSON.stringify(o.msg||{})); m.d=JSON.parse(JSON.stringify(o.d));
+  m.nick=o.nick; m.photo=o.photo; m.goal=o.goal; m.aura=o.aura===true; m.crown=o.crown===true; m.seen=o.seen||0; m.cv=o.cv||0; m.ex=(o.ex||[]).slice(); m.cex=(o.cex||[]).slice(); m.cat=JSON.parse(JSON.stringify(o.cat||{})); m.msg=JSON.parse(JSON.stringify(o.msg||{})); m.d=JSON.parse(JSON.stringify(o.d));
   m.rep=JSON.parse(JSON.stringify(o.rep||{})); m.rep[old]=Date.now();
   delete members[old];
   closeSetup(); render(); saveMine();
